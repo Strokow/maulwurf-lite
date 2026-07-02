@@ -15,6 +15,7 @@ import {
   ChevronsLeft,
 } from 'lucide-react'
 import type { Bank, Obligation, ObligationMonth, ObligationStatus } from '../types'
+import { clampDayToMonth } from '../utils/obligationEngine'
 import { useI18n } from '../i18n'
 
 const statusColors: Record<ObligationStatus, string> = {
@@ -149,10 +150,12 @@ export function ObligationCard({
   if (approxDay !== null && status !== 'paid' && !obligation.isInstallment) {
     const year = today.getFullYear()
     const month = today.getMonth()
-    let nextDate = new Date(year, month, approxDay)
+    // Clamp is mandatory: day 29-31 in a short month would otherwise overflow
+    // into the next one and the "payment in N days" warning would lie.
+    let nextDate = new Date(year, month, clampDayToMonth(year, month, approxDay))
     nextDate.setHours(0, 0, 0, 0)
     if (nextDate < today) {
-      nextDate = new Date(year, month + 1, approxDay)
+      nextDate = new Date(year, month + 1, clampDayToMonth(year, month + 1, approxDay))
     }
     const diff = Math.round((nextDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
     if (diff >= 0 && diff <= 5) {
