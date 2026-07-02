@@ -18,7 +18,7 @@ export interface Bank {
 // ── Obligations ────────────────────────────────────────────
 export type ObligationType = 'subscription' | 'manual_payment'
 export type ObligationStatus = 'paid' | 'unpaid' | 'unknown' | 'skipped'
-export type ObligationFrequency = 'monthly' | 'yearly' | 'once'
+export type ObligationFrequency = 'monthly' | 'quarterly' | 'yearly' | 'once'
 
 export interface Obligation {
   id: string

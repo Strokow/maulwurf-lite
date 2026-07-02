@@ -16,6 +16,7 @@ A single obligations board with a **month switcher** (unlimited past, up to 3 mo
 
 ### Obligation types
 - **Monthly** — regular subscriptions and bills. Without an explicit record they count as *unpaid* (an active subscription awaiting confirmation).
+- **Quarterly** — due every three months. Paying them marks a 3-month coverage window ("Paid until June 2026"), after which they become due again.
 - **Yearly** — due once a year (optionally in a specific month). Paying them marks a 12-month coverage window ("Paid until March 2027").
 - **One-time** — visible only in the month they belong to.
 - **Installment plans** — generic plans with progress tracking (`4/12 payments`, progress bar, original debt). Works with **any** bank, not a specific provider. A completed plan stays visible as history but no longer counts toward the month's totals.

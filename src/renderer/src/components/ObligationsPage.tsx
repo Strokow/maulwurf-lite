@@ -32,9 +32,13 @@ import {
   clampDayToMonth,
   formatLocalDate,
   effectiveAmount,
+  defaultStatus,
   getEffectiveStatus,
   isNativeActive,
   isInstallmentCompleted as engineInstallmentCompleted,
+  coverageMonths,
+  paidUntil as computePaidUntil,
+  type PeriodFrequency,
 } from '../utils/obligationEngine'
 import { ObligationCard } from './ObligationCard'
 import { ObligationModal } from './ObligationModal'
@@ -96,11 +100,14 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
   // Search and filters
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'unpaid' | 'unknown'>('all')
-  const [filterType, setFilterType] = useState<'all' | 'monthly' | 'yearly' | 'once'>('all')
+  const [filterType, setFilterType] = useState<'all' | 'monthly' | 'quarterly' | 'yearly' | 'once'>(
+    'all'
+  )
   const [sortBy, setSortBy] = useState<'name' | 'amount' | 'date'>('name')
 
   // Collapsed built-in sections
   const [collapsedMonthly, setCollapsedMonthly] = useState(false)
+  const [collapsedQuarterly, setCollapsedQuarterly] = useState(false)
   const [collapsedYearly, setCollapsedYearly] = useState(false)
   const [collapsedOnce, setCollapsedOnce] = useState(false)
   const [collapsedInstallments, setCollapsedInstallments] = useState(false)
@@ -139,26 +146,23 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
     [obligations, year, month, carriedInIds]
   )
 
-  // For yearly obligations: find the month they were last paid and compute the
-  // "paid until" window. Paid in month M of year Y → covered until month M-1 of Y+1.
-  const yearlyPaidUntilMap = useMemo(() => {
+  // For period obligations (yearly/quarterly): find the month they were last
+  // paid and compute the "paid until" coverage window. One payment covers 12
+  // months (yearly) or 3 months (quarterly), starting at the payment month.
+  const paidUntilMap = useMemo(() => {
     const map = new Map<
       string,
       { paidMonth: number; paidYear: number; untilMonth: number; untilYear: number }
     >()
     for (const o of active) {
-      if (o.frequency !== 'yearly') continue
+      const freq = o.frequency
+      if (freq !== 'yearly' && freq !== 'quarterly') continue
       let cy = year
       let cm = month
-      for (let i = 0; i < 13; i++) {
+      for (let i = 0; i < coverageMonths(freq as PeriodFrequency) + 1; i++) {
         const rec = getMonthRecord(o.id, cy, cm)
         if (rec?.status === 'paid') {
-          let untilMonth = cm - 1
-          let untilYear = cy + 1
-          if (untilMonth === 0) {
-            untilMonth = 12
-            untilYear--
-          }
+          const { untilYear, untilMonth } = computePaidUntil(freq as PeriodFrequency, cy, cm)
           map.set(o.id, { paidMonth: cm, paidYear: cy, untilMonth, untilYear })
           break
         }
@@ -172,17 +176,17 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
     return map
   }, [active, year, month, getMonthRecord])
 
-  const isYearlyCovered = useCallback(
+  const isPeriodCovered = useCallback(
     (o: Obligation): boolean => {
-      if (o.frequency !== 'yearly') return false
-      const info = yearlyPaidUntilMap.get(o.id)
+      if (o.frequency !== 'yearly' && o.frequency !== 'quarterly') return false
+      const info = paidUntilMap.get(o.id)
       if (!info) return false
       const paidYM = info.paidYear * 12 + info.paidMonth
       const untilYM = info.untilYear * 12 + info.untilMonth
       const currentYM = year * 12 + month
       return currentYM >= paidYM && currentYM <= untilYM
     },
-    [yearlyPaidUntilMap, year, month]
+    [paidUntilMap, year, month]
   )
 
   // For every obligation in the nav month: where its debt was carried TO (if anywhere).
@@ -227,15 +231,15 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
     return [...filtered].sort((a, b) => {
       const recA = getMonthRecord(a.id, year, month)
       const recB = getMonthRecord(b.id, year, month)
-      const aPaid = recA?.status === 'paid' || (a.frequency === 'yearly' && isYearlyCovered(a))
-      const bPaid = recB?.status === 'paid' || (b.frequency === 'yearly' && isYearlyCovered(b))
+      const aPaid = recA?.status === 'paid' || isPeriodCovered(a)
+      const bPaid = recB?.status === 'paid' || isPeriodCovered(b)
       if (aPaid !== bPaid) return aPaid ? 1 : -1
       if (sortBy === 'name') return a.name.localeCompare(b.name)
       if (sortBy === 'amount') return (b.amount ?? 0) - (a.amount ?? 0)
       if (sortBy === 'date') return (b.approximateDay ?? 0) - (a.approximateDay ?? 0)
       return 0
     })
-  }, [filtered, sortBy, getMonthRecord, year, month, isYearlyCovered])
+  }, [filtered, sortBy, getMonthRecord, year, month, isPeriodCovered])
 
   // Installments (any frequency) live in their own subsection and are excluded
   // from monthly/yearly/once — otherwise a one-time installment would land in
@@ -250,6 +254,9 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
     (o) => getMonthRecord(o.id, year, month)?.status === 'paid'
   )
   const installmentAll = sorted.filter((o) => o.isInstallment && !o.sectionId && !o.parentId)
+  const quarterlyObligations = sorted.filter(
+    (o) => o.frequency === 'quarterly' && !o.isInstallment && !o.sectionId && !o.parentId
+  )
   const yearlyObligations = sorted.filter(
     (o) => o.frequency === 'yearly' && !o.isInstallment && !o.sectionId && !o.parentId
   )
@@ -299,10 +306,8 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
 
       const rec = getMonthRecord(o.id, year, month)
 
-      if (o.frequency === 'yearly') {
-        if (isYearlyCovered(o)) return sum
-        if (o.yearlyMonth != null && o.yearlyMonth !== month) return sum
-      }
+      if (isPeriodCovered(o)) return sum
+      if (o.frequency === 'yearly' && o.yearlyMonth != null && o.yearlyMonth !== month) return sum
 
       const base = effectiveAmount(o, year, month) ?? 0
 
@@ -324,7 +329,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
 
       return sum + base
     }, 0)
-  }, [filtered, isYearlyCovered, getMonthRecord, year, month, carryDestMap, isInstallmentCompleted])
+  }, [filtered, isPeriodCovered, getMonthRecord, year, month, carryDestMap, isInstallmentCompleted])
 
   const totalPaidFiltered = useMemo(() => {
     return filtered.reduce((sum, o) => {
@@ -341,8 +346,12 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
     }, 0)
   }, [filtered, getMonthRecord, year, month])
 
-  // Yearly total — natives only (yearly carried into this month gets no own charge).
+  // Period totals — natives only (obligations carried into this month get no own charge).
   const yearlyTotal = yearlyObligations.reduce(
+    (s, o) => s + (isNativeActive(o, year, month) ? (effectiveAmount(o, year, month) ?? 0) : 0),
+    0
+  )
+  const quarterlyTotal = quarterlyObligations.reduce(
     (s, o) => s + (isNativeActive(o, year, month) ? (effectiveAmount(o, year, month) ?? 0) : 0),
     0
   )
@@ -364,13 +373,11 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
       const nativeHere = isNativeActive(o, year, month)
       return !rec.carriedPaid || (nativeHere && rec.status !== 'paid')
     }
-    if (o.frequency === 'yearly') {
-      if (isYearlyCovered(o)) return false
-      if (o.yearlyMonth != null && o.yearlyMonth !== month) return false
-    }
+    if (isPeriodCovered(o)) return false
+    if (o.frequency === 'yearly' && o.yearlyMonth != null && o.yearlyMonth !== month) return false
     if (rec?.status === 'paid') return false
     if (rec && rec.status === 'unknown') return false
-    if (!rec && o.frequency === 'yearly') return false
+    if (!rec && defaultStatus(o) === 'unknown') return false
     return true
   }).length
 
@@ -615,7 +622,12 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
     const carryoverMonthsToPay: Array<{ y: number; m: number; oId: string }> = []
     const collectCarryover = (oId: string): void => {
       const obligation = obligations.find((o) => o.id === oId)
-      if (obligation && obligation.frequency !== 'yearly' && obligation.frequency !== 'once') {
+      if (
+        obligation &&
+        obligation.frequency !== 'yearly' &&
+        obligation.frequency !== 'quarterly' &&
+        obligation.frequency !== 'once'
+      ) {
         const createdDate = new Date(obligation.createdAt)
         const cYear = createdDate.getFullYear()
         const cMonth = createdDate.getMonth() + 1
@@ -809,6 +821,10 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
         if ((obligation.frequency ?? 'monthly') === 'monthly' && !obligation.sectionId && !obligation.parentId)
           return
         patch = { frequency: 'monthly', sectionId: undefined, parentId: undefined }
+      } else if (targetSection === 'quarterly') {
+        if (obligation.frequency === 'quarterly' && !obligation.sectionId && !obligation.parentId)
+          return
+        patch = { frequency: 'quarterly', sectionId: undefined, parentId: undefined }
       } else if (targetSection === 'yearly') {
         if (obligation.frequency === 'yearly' && !obligation.sectionId && !obligation.parentId) return
         patch = { frequency: 'yearly', sectionId: undefined, parentId: undefined }
@@ -993,7 +1009,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
         currentMonthRecord: getMonthRecord(ob.id, year, month),
         bank: ob.bankId ? bankById.get(ob.bankId) : undefined,
         currency,
-        yearlyPaidUntil: yearlyPaidUntilMap.get(ob.id),
+        paidUntil: isPeriodCovered(ob) ? paidUntilMap.get(ob.id) : undefined,
         onEdit: handleEdit,
         onDelete: handleDelete,
         onStatusChange: handleStatusToggle,
@@ -1098,7 +1114,8 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
       bankById,
       currency,
       carryDestMap,
-      yearlyPaidUntilMap,
+      paidUntilMap,
+      isPeriodCovered,
       installmentPaidCountMap,
       handleUnlink,
       onCarryDebt,
@@ -1114,6 +1131,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
     allSorted: Obligation[]
     monthlyAll: Obligation[]
     installmentsAllGroup: Obligation[]
+    quarterlyAll: Obligation[]
     yearlyAll: Obligation[]
     onceAll: Obligation[]
     totalPayable: number
@@ -1131,6 +1149,9 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
     const installmentsAllGroup = allSorted.filter(
       (o) => o.isInstallment && !o.sectionId && !o.parentId
     )
+    const quarterlyAll = allSorted.filter(
+      (o) => o.frequency === 'quarterly' && !o.isInstallment && !o.sectionId && !o.parentId
+    )
     const yearlyAll = allSorted.filter(
       (o) => o.frequency === 'yearly' && !o.isInstallment && !o.sectionId && !o.parentId
     )
@@ -1142,10 +1163,8 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
       if (isInstallmentCompleted(o)) return sum
       if (carryDestMap.has(o.id)) return sum
       const rec = getMonthRecord(o.id, year, month)
-      if (o.frequency === 'yearly') {
-        if (isYearlyCovered(o)) return sum
-        if (o.yearlyMonth != null && o.yearlyMonth !== month) return sum
-      }
+      if (isPeriodCovered(o)) return sum
+      if (o.frequency === 'yearly' && o.yearlyMonth != null && o.yearlyMonth !== month) return sum
       const base = effectiveAmount(o, year, month) ?? 0
       if (rec?.isCarriedOver) {
         const nativeHere = isNativeActive(o, year, month)
@@ -1156,7 +1175,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
       }
       if (rec?.status === 'paid') return sum
       if (rec && rec.status === 'unknown') return sum
-      if (!rec && o.frequency === 'yearly') return sum
+      if (!rec && defaultStatus(o) === 'unknown') return sum
       return sum + base
     }, 0)
 
@@ -1187,13 +1206,11 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
         const nativeHere = isNativeActive(o, year, month)
         return !rec.carriedPaid || (nativeHere && rec.status !== 'paid')
       }
-      if (o.frequency === 'yearly') {
-        if (isYearlyCovered(o)) return false
-        if (o.yearlyMonth != null && o.yearlyMonth !== month) return false
-      }
+      if (isPeriodCovered(o)) return false
+      if (o.frequency === 'yearly' && o.yearlyMonth != null && o.yearlyMonth !== month) return false
       if (rec?.status === 'paid') return false
       if (rec && rec.status === 'unknown') return false
-      if (!rec && o.frequency === 'yearly') return false
+      if (!rec && defaultStatus(o) === 'unknown') return false
       return true
     }).length
 
@@ -1201,6 +1218,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
       allSorted,
       monthlyAll,
       installmentsAllGroup,
+      quarterlyAll,
       yearlyAll,
       onceAll,
       totalPayable,
@@ -1208,7 +1226,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
       paidCountAll,
       pendingCountAll,
     }
-  }, [active, carryDestMap, getMonthRecord, isInstallmentCompleted, isYearlyCovered, year, month])
+  }, [active, carryDestMap, getMonthRecord, isInstallmentCompleted, isPeriodCovered, year, month])
 
   const statusLabel = useCallback(
     (s: ObligationStatus): string =>
@@ -1225,9 +1243,11 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
     (f?: ObligationFrequency): string =>
       f === 'yearly'
         ? t('exportFrequencyYearly')
-        : f === 'once'
-          ? t('exportFrequencyOnce')
-          : t('exportFrequencyMonthly'),
+        : f === 'quarterly'
+          ? t('exportFrequencyQuarterly')
+          : f === 'once'
+            ? t('exportFrequencyOnce')
+            : t('exportFrequencyMonthly'),
     [t]
   )
 
@@ -1255,9 +1275,9 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
             `| ${name} | ${freqLabel(o.frequency)} | — | ${dayStr} | ${t('exportCarriedTo', { month: monthYear(transferredOut.toYear, transferredOut.toMonth) })} | ${notes} |`
           )
         } else {
-          const st = isYearlyCovered(o)
+          const st = isPeriodCovered(o)
             ? 'paid'
-            : ((rec?.status ?? (o.frequency === 'yearly' ? 'unknown' : 'unpaid')) as ObligationStatus)
+            : (rec?.status ?? defaultStatus(o))
           const ea = effectiveAmount(o, year, month)
           const amt = ea !== null ? fmt(ea) : '—'
           out.push(
@@ -1308,6 +1328,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
       `| ${t('exportPending')} | ${data.pendingCountAll} |`,
       renderGroupMd(t('sectionMonthly'), data.monthlyAll),
       renderGroupMd(t('sectionInstallments'), data.installmentsAllGroup),
+      renderGroupMd(t('sectionQuarterly'), data.quarterlyAll),
       renderGroupMd(t('sectionYearly'), data.yearlyAll),
       renderGroupMd(t('sectionOnce'), data.onceAll),
       allCustomMd,
@@ -1323,7 +1344,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
     month,
     currentMonthLabel,
     carryDestMap,
-    isYearlyCovered,
+    isPeriodCovered,
     childrenMap,
     t,
     tn,
@@ -1364,9 +1385,9 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
           <td style="${td};color:#666">${o.notes ?? ''}</td>
         </tr>`)
         } else {
-          const st = isYearlyCovered(o)
+          const st = isPeriodCovered(o)
             ? 'paid'
-            : ((rec?.status ?? (o.frequency === 'yearly' ? 'unknown' : 'unpaid')) as ObligationStatus)
+            : (rec?.status ?? defaultStatus(o))
           const ea = effectiveAmount(o, year, month)
           const amt = ea !== null ? fmt(ea) : '—'
           out.push(`<tr>
@@ -1460,6 +1481,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
   </div>
   ${renderGroup(t('sectionMonthly'), data.monthlyAll)}
   ${renderGroup(t('sectionInstallments'), data.installmentsAllGroup)}
+  ${renderGroup(t('sectionQuarterly'), data.quarterlyAll)}
   ${renderGroup(t('sectionYearly'), data.yearlyAll)}
   ${renderGroup(t('sectionOnce'), data.onceAll)}
   ${allCustom}
@@ -1476,7 +1498,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
     month,
     currentMonthLabel,
     carryDestMap,
-    isYearlyCovered,
+    isPeriodCovered,
     childrenMap,
     t,
     tn,
@@ -1610,6 +1632,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
             [
               ['all', t('filterAll')],
               ['monthly', t('typeMonthly')],
+              ['quarterly', t('typeQuarterly')],
               ['yearly', t('typeYearly')],
               ['once', t('typeOnce')],
             ] as const
@@ -1832,6 +1855,60 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
                   >
                     <Plus className="h-4 w-4" />
                     {t('addObligation')}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Quarterly */}
+        <div
+          className={`rounded-xl border bg-neutral-900/30 transition-colors ${
+            dragOverSection === 'quarterly' ? 'border-blue-600 bg-blue-950/10' : 'border-neutral-800'
+          }`}
+          onDragOver={(e) => handleDragOver(e, 'quarterly')}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => void handleDrop(e, 'quarterly')}
+        >
+          <div
+            className="flex cursor-pointer items-center justify-between px-4 py-3"
+            onClick={() => setCollapsedQuarterly(!collapsedQuarterly)}
+          >
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-medium text-neutral-300">{t('sectionQuarterly')}</h3>
+              <span className="rounded-full bg-neutral-800 px-2 py-0.5 text-xs text-neutral-400">
+                {quarterlyObligations.length}
+              </span>
+              <span className="text-xs text-neutral-500">
+                {fmt(quarterlyTotal)}
+                {t('perQuarter')}
+              </span>
+            </div>
+            <ChevronDown
+              className={`h-4 w-4 text-neutral-500 transition-transform ${collapsedQuarterly ? '-rotate-90' : ''}`}
+            />
+          </div>
+          <AnimatePresence>
+            {!collapsedQuarterly && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="space-y-2 p-4 pt-0">
+                  {quarterlyObligations.length === 0 ? (
+                    <p className="text-sm text-neutral-500">{t('noQuarterly')}</p>
+                  ) : (
+                    quarterlyObligations.map((o) => renderObligationWithChildren(o))
+                  )}
+                  <button
+                    onClick={() => handleOpenAdd('manual_payment', 'quarterly')}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-700 py-2 text-sm text-neutral-500 transition-colors hover:border-neutral-500 hover:text-neutral-300"
+                  >
+                    <Plus className="h-4 w-4" />
+                    {t('addQuarterly')}
                   </button>
                 </div>
               </motion.div>

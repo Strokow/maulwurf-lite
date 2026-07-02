@@ -289,7 +289,10 @@ export function ObligationModal({
                 </div>
               </div>
 
-              {editObligation && (form.frequency === 'monthly' || form.frequency === 'yearly') && (
+              {editObligation &&
+                (form.frequency === 'monthly' ||
+                  form.frequency === 'quarterly' ||
+                  form.frequency === 'yearly') && (
                 <label className="flex cursor-pointer select-none items-start gap-2 rounded-md border border-neutral-700 bg-neutral-800/50 px-3 py-2 text-xs text-neutral-300">
                   <input
                     type="checkbox"
@@ -320,8 +323,9 @@ export function ObligationModal({
 
               <div>
                 <label className="mb-1 block text-xs text-neutral-400">{t('fieldFrequency')}</label>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {freqButton('monthly', t('typeMonthly'))}
+                  {freqButton('quarterly', t('typeQuarterly'))}
                   {freqButton('yearly', t('typeYearly'))}
                   {freqButton('once', t('typeOnce'))}
                 </div>

@@ -30,7 +30,7 @@ Defined in [`src/renderer/src/types/index.ts`](../src/renderer/src/types/index.t
 
 | Entity | Purpose |
 |---|---|
-| `Obligation` | A recurring/one-time payment: name, amount, approximate day, frequency (`monthly` / `yearly` / `once`), user-defined `bankId`, optional installment plan (`isInstallment`, `totalInstallments`, `originalTotal`), effective-dated price history (`amountChanges`), section/parent links. |
+| `Obligation` | A recurring/one-time payment: name, amount, approximate day, frequency (`monthly` / `quarterly` / `yearly` / `once`), user-defined `bankId`, optional installment plan (`isInstallment`, `totalInstallments`, `originalTotal`), effective-dated price history (`amountChanges`), section/parent links. |
 | `ObligationMonth` | The payment **status of one obligation for one month**. Key: `(obligationId, year, month)`. Status: `paid` / `unpaid` / `unknown` / `skipped`. Also holds the carry-over fields (`isCarriedOver`, `carriedFromYear/Month`, `carriedAmount`, `carriedPaid`). |
 | `Bank` | User-defined bank / payment service (name + badge color). Deleting a bank detaches it from obligations, which keep working without one. |
 | `ObligationSection` | A custom card group, filled via drag & drop. |
@@ -41,7 +41,7 @@ Defined in [`src/renderer/src/types/index.ts`](../src/renderer/src/types/index.t
 
 ## Core invariants
 
-1. **Month status resolution:** an `ObligationMonth` record always wins. Without a record the default is `yearly → 'unknown'`, `monthly`/`once → 'unpaid'`. Implemented once in `obligationEngine.getEffectiveStatus` and used everywhere (cards, totals, export).
+1. **Month status resolution:** an `ObligationMonth` record always wins. Without a record the default is `yearly`/`quarterly → 'unknown'`, `monthly`/`once → 'unpaid'`. Implemented once in `obligationEngine.getEffectiveStatus` and used everywhere (cards, totals, export). Period obligations (yearly/quarterly) paid in month M are covered for `coverageMonths` (12 / 3) starting at M (`paidUntil` in the engine); covered months show as paid and are excluded from totals.
 2. **Native occurrence:** an obligation is "native" to a month only when the month is ≥ its `createdAt` month (`once` — only its creation month). The month's own charge is added to totals **only when native** (`isNativeActive` gate). Cards that appear in a month solely because a debt was carried there owe only the carried amount.
 3. **Effective price:** every amount shown or summed for a month goes through `effectiveAmount(o, year, month)`, honouring `amountChanges`. Past months are never rewritten by a price change.
 4. **Completed installment plans** (paid count ≥ `totalInstallments`) are excluded from every "to pay" total and counter, but stay visible as history.

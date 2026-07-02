@@ -24,7 +24,7 @@ const statusColors: Record<ObligationStatus, string> = {
   skipped: 'bg-neutral-800 text-neutral-600',
 }
 
-interface YearlyPaidUntilInfo {
+interface PaidUntilInfo {
   paidMonth: number
   paidYear: number
   untilMonth: number
@@ -36,7 +36,9 @@ interface ObligationCardProps {
   currentMonthRecord: ObligationMonth | null
   bank?: Bank
   currency: string
-  yearlyPaidUntil?: YearlyPaidUntilInfo
+  // "Paid until" coverage window of a period obligation (yearly/quarterly);
+  // passed only when the viewed month is actually covered.
+  paidUntil?: PaidUntilInfo
   onEdit: (obligation: Obligation) => void
   onDelete: (id: string) => void
   onStatusChange: (obligationId: string, status: ObligationStatus) => void
@@ -67,7 +69,7 @@ export function ObligationCard({
   currentMonthRecord,
   bank,
   currency,
-  yearlyPaidUntil,
+  paidUntil,
   onEdit,
   onDelete,
   onStatusChange,
@@ -105,12 +107,17 @@ export function ObligationCard({
     skipped: t('statusSkipped'),
   }
 
-  // Yearly obligations covered by a past payment show as "paid" without a record.
-  const isYearlyCovered = obligation.frequency === 'yearly' && !!yearlyPaidUntil
-  // Default without a record: yearly → 'unknown' (we don't know if it is due
-  // this month); monthly and once → 'unpaid'.
-  const defaultStatus: ObligationStatus = obligation.frequency === 'yearly' ? 'unknown' : 'unpaid'
-  const status: ObligationStatus = isYearlyCovered
+  // Period obligations (yearly/quarterly) covered by a past payment show as
+  // "paid" without a record.
+  const isPeriodCovered =
+    (obligation.frequency === 'yearly' || obligation.frequency === 'quarterly') && !!paidUntil
+  // Default without a record: yearly/quarterly → 'unknown' (we don't know if it
+  // is due this month); monthly and once → 'unpaid'.
+  const defaultStatus: ObligationStatus =
+    obligation.frequency === 'yearly' || obligation.frequency === 'quarterly'
+      ? 'unknown'
+      : 'unpaid'
+  const status: ObligationStatus = isPeriodCovered
     ? 'paid'
     : (currentMonthRecord?.status ?? defaultStatus)
 
@@ -208,11 +215,11 @@ export function ObligationCard({
                 {t('viaParent', { name: parentName })}
               </span>
             )}
-            {isYearlyCovered ? (
+            {isPeriodCovered ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-green-900/40 px-2 py-0.5 text-xs font-medium text-green-300">
                 <CalendarCheck className="h-3 w-3" />
                 {t('paidUntil', {
-                  month: monthYear(yearlyPaidUntil.untilYear, yearlyPaidUntil.untilMonth),
+                  month: monthYear(paidUntil!.untilYear, paidUntil!.untilMonth),
                 })}
               </span>
             ) : isChild ? (
@@ -254,6 +261,12 @@ export function ObligationCard({
                     ? t('yearlyIn', { month: monthName(obligation.yearlyMonth) })
                     : t('yearlyLabel')}
                 </span>
+              </>
+            )}
+            {obligation.frequency === 'quarterly' && (
+              <>
+                <span>·</span>
+                <span className="text-cyan-400">{t('quarterlyLabel')}</span>
               </>
             )}
             {obligation.frequency === 'once' && (
@@ -535,6 +548,7 @@ export function ObligationCard({
               <div className="mb-2 flex items-center justify-between">
                 <button
                   onClick={() => setPickerYear(pickerYear - 1)}
+                  title={t('prevYear')}
                   className="rounded p-1 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200"
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
@@ -542,6 +556,7 @@ export function ObligationCard({
                 <span className="text-xs font-medium text-neutral-300">{pickerYear}</span>
                 <button
                   onClick={() => setPickerYear(pickerYear + 1)}
+                  title={t('nextYear')}
                   className="rounded p-1 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200"
                 >
                   <ChevronRight className="h-3.5 w-3.5" />
@@ -580,6 +595,7 @@ export function ObligationCard({
               <div className="mb-2 flex items-center justify-between">
                 <button
                   onClick={() => setCarryPickerYear(carryPickerYear - 1)}
+                  title={t('prevYear')}
                   className="rounded p-1 text-amber-400/70 hover:bg-amber-900/40 hover:text-amber-300"
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
@@ -587,6 +603,7 @@ export function ObligationCard({
                 <span className="text-xs font-medium text-amber-300">{carryPickerYear}</span>
                 <button
                   onClick={() => setCarryPickerYear(carryPickerYear + 1)}
+                  title={t('nextYear')}
                   className="rounded p-1 text-amber-400/70 hover:bg-amber-900/40 hover:text-amber-300"
                 >
                   <ChevronRight className="h-3.5 w-3.5" />

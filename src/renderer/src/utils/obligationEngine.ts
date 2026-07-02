@@ -35,12 +35,36 @@ export function effectiveAmount(
 }
 
 // Default status when no ObligationMonth record exists:
-// yearly → 'unknown' (we don't know whether it is due this month);
+// yearly/quarterly → 'unknown' (we don't know whether it is due this month);
 // monthly/once → 'unpaid' (an active subscription / pending payment).
 // A once obligation is only visible in its creation month, where the payment
 // genuinely lies ahead — hence 'unpaid', not 'unknown'.
 export function defaultStatus(o: Pick<Obligation, 'frequency'>): ObligationStatus {
-  return (o.frequency ?? 'monthly') === 'yearly' ? 'unknown' : 'unpaid'
+  const f = o.frequency ?? 'monthly'
+  return f === 'yearly' || f === 'quarterly' ? 'unknown' : 'unpaid'
+}
+
+// Period obligations (yearly/quarterly): one payment covers this many months.
+export type PeriodFrequency = 'yearly' | 'quarterly'
+
+export function coverageMonths(frequency: PeriodFrequency): number {
+  return frequency === 'yearly' ? 12 : 3
+}
+
+// Given a payment in (paidYear, paidMonth), the last covered month (inclusive):
+// yearly paid in Mar 2026 → until Feb 2027; quarterly paid in Nov 2026 → until Jan 2027.
+export function paidUntil(
+  frequency: PeriodFrequency,
+  paidYear: number,
+  paidMonth: number
+): { untilYear: number; untilMonth: number } {
+  let untilMonth = paidMonth + coverageMonths(frequency) - 1
+  let untilYear = paidYear
+  while (untilMonth > 12) {
+    untilMonth -= 12
+    untilYear++
+  }
+  return { untilYear, untilMonth }
 }
 
 export function getEffectiveStatus(

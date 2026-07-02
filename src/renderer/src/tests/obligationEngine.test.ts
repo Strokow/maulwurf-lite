@@ -8,6 +8,8 @@ import {
   isNativeActive,
   paidInstallmentCount,
   isInstallmentCompleted,
+  coverageMonths,
+  paidUntil,
 } from '../utils/obligationEngine'
 import type { Obligation, ObligationMonth } from '../types'
 
@@ -82,8 +84,9 @@ describe('effectiveAmount', () => {
 })
 
 describe('defaultStatus / getEffectiveStatus', () => {
-  it('yearly defaults to unknown', () => {
+  it('yearly and quarterly default to unknown', () => {
     expect(defaultStatus({ frequency: 'yearly' })).toBe('unknown')
+    expect(defaultStatus({ frequency: 'quarterly' })).toBe('unknown')
   })
   it('monthly and once default to unpaid', () => {
     expect(defaultStatus({ frequency: 'monthly' })).toBe('unpaid')
@@ -112,6 +115,28 @@ describe('isNativeActive', () => {
     expect(isNativeActive(o, 2026, 3)).toBe(true)
     expect(isNativeActive(o, 2026, 4)).toBe(false)
     expect(isNativeActive(o, 2026, 2)).toBe(false)
+  })
+})
+
+describe('period coverage (yearly / quarterly)', () => {
+  it('coverage windows', () => {
+    expect(coverageMonths('yearly')).toBe(12)
+    expect(coverageMonths('quarterly')).toBe(3)
+  })
+  it('yearly paid in Mar 2026 covers until Feb 2027', () => {
+    expect(paidUntil('yearly', 2026, 3)).toEqual({ untilYear: 2027, untilMonth: 2 })
+  })
+  it('yearly paid in Jan covers until Dec of the same year', () => {
+    expect(paidUntil('yearly', 2026, 1)).toEqual({ untilYear: 2026, untilMonth: 12 })
+  })
+  it('quarterly paid in Feb 2026 covers Feb–Apr 2026', () => {
+    expect(paidUntil('quarterly', 2026, 2)).toEqual({ untilYear: 2026, untilMonth: 4 })
+  })
+  it('quarterly paid in Nov 2026 rolls over the year boundary (until Jan 2027)', () => {
+    expect(paidUntil('quarterly', 2026, 11)).toEqual({ untilYear: 2027, untilMonth: 1 })
+  })
+  it('quarterly paid in Dec 2026 covers until Feb 2027', () => {
+    expect(paidUntil('quarterly', 2026, 12)).toEqual({ untilYear: 2027, untilMonth: 2 })
   })
 })
 
