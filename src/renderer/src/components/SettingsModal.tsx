@@ -440,6 +440,7 @@ export function SettingsModal({ isOpen, onClose, store }: SettingsModalProps): R
                             </button>
                             <button
                               onClick={() => setRestoreConfirm(null)}
+                              title={t('cancel')}
                               className="text-neutral-500 hover:text-neutral-300"
                             >
                               <X className="h-3.5 w-3.5" />
@@ -463,7 +464,7 @@ export function SettingsModal({ isOpen, onClose, store }: SettingsModalProps): R
               {/* About */}
               <div className={sectionCls}>
                 <h3 className="text-sm font-medium text-neutral-300">{t('settingsAbout')}</h3>
-                <p className="text-xs text-neutral-500">Maulwurf Lite · v1.0.0 · local-first, no cloud</p>
+                <p className="text-xs text-neutral-500">Maulwurf Lite · v1.1.0 · local-first, no cloud</p>
               </div>
             </div>
           </motion.div>
