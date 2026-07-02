@@ -28,6 +28,9 @@ export const fr: Record<TranslationKey, string> = {
 
   // Header / toolbar
   obligations: 'Engagements',
+  prevMonth: 'Mois précédent',
+  nextMonth: 'Mois suivant',
+  clearSearch: 'Effacer la recherche',
   undo: 'Annuler',
   redo: 'Rétablir',
   settings: 'Réglages',
@@ -67,6 +70,8 @@ export const fr: Record<TranslationKey, string> = {
   noYearly: 'Aucun engagement annuel',
   noOnce: 'Aucun engagement ponctuel',
   noInstallments: 'Aucun paiement échelonné actif',
+  sectionInstallmentsExample: 'ex. Klarna, PayPal « Paiement en 4 fois », financement en magasin',
+  addInstallmentFull: 'Ajouter un paiement échelonné',
   addObligation: 'Ajouter un engagement',
   addYearly: 'Ajouter un annuel',
   addOnce: 'Ajouter un ponctuel',
@@ -134,6 +139,7 @@ export const fr: Record<TranslationKey, string> = {
 
   // Add/edit modal
   newObligation: 'Nouvel engagement',
+  newInstallment: 'Nouveau paiement échelonné',
   editObligation: 'Modifier l’engagement',
   fieldName: 'Nom',
   fieldNamePlaceholder: 'ex. Netflix, loyer, salle de sport…',
@@ -150,6 +156,7 @@ export const fr: Record<TranslationKey, string> = {
   notSpecified: 'Non précisé',
   priceFromThisMonth: 'Modifier le prix uniquement à partir du mois ouvert — les mois passés gardent l’ancien montant.',
   installmentPlan: 'Paiement échelonné',
+  installmentPlanHint: 'Un achat remboursé en parts égales (comme Klarna). Indiquez le nombre total de paiements et combien sont déjà payés — les mois passés sont marqués automatiquement.',
   fieldTotalInstallments: 'Nombre de paiements',
   fieldPaidInstallments: 'Déjà payés',
   fieldOriginalTotal: 'Dette totale',

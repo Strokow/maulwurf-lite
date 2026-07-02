@@ -1500,6 +1500,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
             <button
               onClick={handlePrevMonth}
               disabled={!canGoPrev}
+              title={t('prevMonth')}
               className="rounded p-1 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-30"
             >
               <ChevronLeft className="h-5 w-5" />
@@ -1510,6 +1511,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
             <button
               onClick={handleNextMonth}
               disabled={!canGoNext}
+              title={t('nextMonth')}
               className="rounded p-1 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-30"
             >
               <ChevronRight className="h-5 w-5" />
@@ -1574,6 +1576,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
+              title={t('clearSearch')}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300"
             >
               <X className="h-4 w-4" />
@@ -1802,10 +1805,17 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
                               <div className="space-y-2 px-3 pb-3">
                                 {installmentAll.length === 0 && (
                                   <p className="py-1 text-xs text-pink-400/40">
-                                    {t('noInstallments')}
+                                    {t('noInstallments')} · {t('sectionInstallmentsExample')}
                                   </p>
                                 )}
                                 {installmentAll.map((o) => renderObligationWithChildren(o))}
+                                <button
+                                  onClick={() => handleOpenAdd('manual_payment', 'monthly', true)}
+                                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-pink-800/50 py-2 text-xs text-pink-400/70 transition-colors hover:border-pink-600 hover:text-pink-300"
+                                >
+                                  <Plus className="h-3.5 w-3.5" />
+                                  {t('addInstallmentFull')}
+                                </button>
                               </div>
                             </motion.div>
                           )}
@@ -1983,10 +1993,13 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
                             setRenamingSectionName('')
                           }
                         }}
+                        title={t('renameSection')}
+                        placeholder={t('sectionNamePlaceholder')}
                         className="rounded border border-neutral-600 bg-neutral-800 px-2 py-0.5 text-sm text-neutral-200 focus:border-purple-600 focus:outline-none"
                       />
                       <button
                         onClick={() => void handleRenameSection(section.id)}
+                        title={t('renameSection')}
                         className="p-0.5 text-green-400 hover:text-green-300"
                       >
                         <CheckIcon className="h-4 w-4" />
@@ -2076,6 +2089,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
                 setShowAddSection(false)
                 setNewSectionName('')
               }}
+              title={t('cancel')}
               className="text-neutral-500 hover:text-neutral-300"
             >
               <X className="h-4 w-4" />

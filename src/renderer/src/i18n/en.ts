@@ -26,6 +26,9 @@ export const en = {
 
   // Header / toolbar
   obligations: 'Obligations',
+  prevMonth: 'Previous month',
+  nextMonth: 'Next month',
+  clearSearch: 'Clear search',
   undo: 'Undo',
   redo: 'Redo',
   settings: 'Settings',
@@ -65,6 +68,8 @@ export const en = {
   noYearly: 'No yearly obligations',
   noOnce: 'No one-time obligations',
   noInstallments: 'No active installment plans',
+  sectionInstallmentsExample: 'e.g. Klarna, PayPal “Pay in 4”, store financing',
+  addInstallmentFull: 'Add installment plan',
   addObligation: 'Add obligation',
   addYearly: 'Add yearly',
   addOnce: 'Add one-time',
@@ -132,6 +137,7 @@ export const en = {
 
   // Add/edit modal
   newObligation: 'New obligation',
+  newInstallment: 'New installment plan',
   editObligation: 'Edit obligation',
   fieldName: 'Name',
   fieldNamePlaceholder: 'e.g. Netflix, rent, gym…',
@@ -148,6 +154,7 @@ export const en = {
   notSpecified: 'Not specified',
   priceFromThisMonth: 'Change the price only from the open month onward — past months keep the old amount.',
   installmentPlan: 'Installment plan',
+  installmentPlanHint: 'A purchase paid off in equal parts (like Klarna). Enter the total number of payments and how many are already paid — past months are marked automatically.',
   fieldTotalInstallments: 'Total payments',
   fieldPaidInstallments: 'Already paid',
   fieldOriginalTotal: 'Total debt',

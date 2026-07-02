@@ -208,7 +208,11 @@ export function ObligationModal({
           >
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-neutral-100">
-                {editObligation ? t('editObligation') : t('newObligation')}
+                {editObligation
+                  ? t('editObligation')
+                  : form.isInstallment
+                    ? t('newInstallment')
+                    : t('newObligation')}
               </h2>
               <button
                 onClick={onClose}
@@ -344,14 +348,25 @@ export function ObligationModal({
                 </div>
               )}
 
-              <label className="flex cursor-pointer select-none items-center gap-2 rounded-md border border-neutral-700 bg-neutral-800/50 px-3 py-2 text-xs text-neutral-300">
+              <label
+                className={`flex cursor-pointer select-none items-start gap-2.5 rounded-lg border px-3 py-2.5 text-xs transition-colors ${
+                  form.isInstallment
+                    ? 'border-pink-700/60 bg-pink-950/30'
+                    : 'border-pink-900/40 bg-pink-950/10 hover:border-pink-800/60'
+                }`}
+              >
                 <input
                   type="checkbox"
                   checked={form.isInstallment}
                   onChange={(e) => update('isInstallment', e.target.checked)}
-                  className="h-4 w-4 shrink-0 accent-pink-600"
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-pink-600"
                 />
-                <span className="font-medium text-pink-400">{t('installmentPlan')}</span>
+                <span>
+                  <span className="text-sm font-medium text-pink-400">{t('installmentPlan')}</span>
+                  <span className="mt-0.5 block leading-relaxed text-neutral-500">
+                    {t('installmentPlanHint')}
+                  </span>
+                </span>
               </label>
 
               {form.isInstallment && (
