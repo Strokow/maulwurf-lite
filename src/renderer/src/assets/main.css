@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Dark theme for native controls: <input type="date"> calendar, default scrollbars */
+:root {
+  color-scheme: dark;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background-color: #0f0f0f;
+  color: #e5e5e5;
+  overflow-x: hidden;
+}
+
+/* Custom dark scrollbar (instead of the white system one) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #171717;
+}
+::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 6px;
+  border: 2px solid #171717;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #525252;
+}
