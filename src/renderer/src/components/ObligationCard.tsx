@@ -121,6 +121,10 @@ export function ObligationCard({
   const status: ObligationStatus = isPeriodCovered
     ? 'paid'
     : (currentMonthRecord?.status ?? defaultStatus)
+  // The viewed month holds the actual 'paid' record of the period payment →
+  // keep the status button clickable so the payment can be reverted; later
+  // covered months have no record of their own to toggle.
+  const isPaidSourceMonth = isPeriodCovered && currentMonthRecord?.status === 'paid'
 
   // The obligation natively occurs this month; false → shown only because a
   // debt was carried here → no current charge.
@@ -218,14 +222,15 @@ export function ObligationCard({
                 {t('viaParent', { name: parentName })}
               </span>
             )}
-            {isPeriodCovered ? (
+            {isPeriodCovered && (
               <span className="inline-flex items-center gap-1 rounded-full bg-green-900/40 px-2 py-0.5 text-xs font-medium text-green-300">
                 <CalendarCheck className="h-3 w-3" />
                 {t('paidUntil', {
                   month: monthYear(paidUntil!.untilYear, paidUntil!.untilMonth),
                 })}
               </span>
-            ) : isChild ? (
+            )}
+            {isPeriodCovered && !isPaidSourceMonth ? null : isChild ? (
               <span
                 className={`cursor-default rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[status]} opacity-70`}
                 title={t('paidViaParent', { name: parentName ?? '' })}
