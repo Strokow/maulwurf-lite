@@ -1,5 +1,5 @@
 // ── Language / settings ────────────────────────────────────
-export type Language = 'en' | 'fr'
+export type Language = 'en' | 'fr' | 'de' | 'ru'
 
 export interface AppSettings {
   language: Language

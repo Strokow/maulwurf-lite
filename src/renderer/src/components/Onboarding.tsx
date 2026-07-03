@@ -56,7 +56,7 @@ export function Onboarding({ onComplete }: OnboardingProps): React.JSX.Element {
             <Globe className="mx-auto mb-3 h-10 w-10 text-neutral-400" />
             <h1 className="text-xl font-semibold text-neutral-100">Maulwurf Lite</h1>
             <p className="mt-2 text-sm text-neutral-400">
-              Choose your language · Choisissez votre langue
+              Choose your language · Choisissez votre langue · Sprache wählen · Выберите язык
             </p>
           </div>
           <div className="space-y-2">
@@ -64,6 +64,8 @@ export function Onboarding({ onComplete }: OnboardingProps): React.JSX.Element {
               [
                 { value: 'en', label: 'English' },
                 { value: 'fr', label: 'Français' },
+                { value: 'de', label: 'Deutsch' },
+                { value: 'ru', label: 'Русский' },
               ] as { value: Language; label: string }[]
             ).map((opt) => (
               <button

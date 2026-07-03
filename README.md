@@ -4,7 +4,7 @@ A minimal, local-first desktop app for tracking **recurring financial obligation
 
 Maulwurf Lite is the lightweight sibling of the [Maulwurf personal finance tracker](https://github.com/Strokow/Maulwurf-Personal-Finance-Tracker). It keeps exactly one thing: the obligations board. No transaction import, no dashboards, no AI — just a clear answer to *"What do I still have to pay this month?"*
 
-- **Interface languages: English and French** — chosen on first run, switchable anytime in Settings.
+- **Interface languages: English, French, German and Russian** — chosen on first run, switchable anytime in Settings.
 - **Your own banks** — nothing is hard-coded. Add any bank or payment service (name + color) and assign it to obligations.
 - **100% local** — all data stays on your machine (`electron-store` JSON + automatic local backups). No accounts, no cloud, no telemetry.
 - **PIN protection** — optional 6-digit PIN with lockout after 3 failed attempts (SHA-256 hash only, never plaintext).
@@ -36,7 +36,7 @@ An unpaid obligation can be **carried to any future month**. The source card is 
 
 ## First run
 
-1. **Choose your language** (English / Français).
+1. **Choose your language** (English / Français / Deutsch / Русский).
 2. **Set a 6-digit PIN** — or skip and enable it later in Settings.
 3. Add your banks in **Settings → Banks** and start adding obligations.
 

@@ -164,11 +164,13 @@ export function SettingsModal({ isOpen, onClose, store }: SettingsModalProps): R
               {/* Language */}
               <div className={sectionCls}>
                 <h3 className="text-sm font-medium text-neutral-300">{t('settingsLanguage')}</h3>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {(
                     [
                       { value: 'en', label: 'English' },
                       { value: 'fr', label: 'Français' },
+                      { value: 'de', label: 'Deutsch' },
+                      { value: 'ru', label: 'Русский' },
                     ] as { value: Language; label: string }[]
                   ).map((opt) => (
                     <button

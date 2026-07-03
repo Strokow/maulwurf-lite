@@ -2,8 +2,17 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import type { Language } from '../types'
 import { en, type TranslationKey } from './en'
 import { fr } from './fr'
+import { de } from './de'
+import { ru } from './ru'
 
-const dictionaries: Record<Language, Record<TranslationKey, string>> = { en, fr }
+const dictionaries: Record<Language, Record<TranslationKey, string>> = { en, fr, de, ru }
+
+const locales: Record<Language, string> = {
+  en: 'en-US',
+  fr: 'fr-FR',
+  de: 'de-DE',
+  ru: 'ru-RU',
+}
 
 export type { TranslationKey }
 
@@ -11,7 +20,8 @@ export interface I18n {
   language: Language
   locale: string // BCP 47 locale for Intl APIs
   t: (key: TranslationKey, params?: Record<string, string | number>) => string
-  // Plural-aware translation: picks `${key}_one` / `${key}_other` and injects {n}.
+  // Plural-aware translation: picks the CLDR form (`${key}_one/_few/_many/_other`,
+  // falling back to `_other`) and injects {n}.
   tn: (key: string, n: number, params?: Record<string, string | number>) => string
   monthName: (month: number) => string // 1-12, standalone ("March" / "mars")
   monthYear: (year: number, month: number) => string // "March 2026" / "mars 2026"
@@ -29,14 +39,18 @@ function interpolate(template: string, params?: Record<string, string | number>)
 
 export function buildI18n(language: Language): I18n {
   const dict = dictionaries[language]
-  const locale = language === 'fr' ? 'fr-FR' : 'en-US'
+  const locale = locales[language]
   const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 
   const t: I18n['t'] = (key, params) => interpolate(dict[key] ?? key, params)
 
+  // CLDR plural category ('one' | 'few' | 'many' | 'other') per locale; the
+  // dictionary key is `${key}_${category}` with `_other` as the fallback.
+  // EN/FR/DE only define _one/_other; RU adds _few/_many where needed.
+  const pluralRules = new Intl.PluralRules(locale)
   const tn: I18n['tn'] = (key, n, params) => {
-    const suffix = n === 1 ? '_one' : '_other'
-    const full = (dict as Record<string, string>)[key + suffix] ?? key + suffix
+    const d = dict as Record<string, string>
+    const full = d[`${key}_${pluralRules.select(n)}`] ?? d[`${key}_other`] ?? `${key}_other`
     return interpolate(full, { n, ...params })
   }
 
