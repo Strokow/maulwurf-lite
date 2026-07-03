@@ -46,6 +46,8 @@ The app starts completely empty — no sample data, no assumptions about your ba
 
 Download the latest `Maulwurf-Lite-X.Y.Z-setup.exe` from the [Releases](https://github.com/Strokow/maulwurf-lite/releases) page and run it (Windows).
 
+> **Windows SmartScreen note:** the installer is not code-signed (signing certificates are paid), so on first run Windows may show *"Windows protected your PC"*. Click **More info → Run anyway** to proceed. The app is open source — you can inspect the code in this repository or build the installer yourself with `npm run build:win`.
+
 ## Development
 
 ```bash
@@ -67,3 +69,7 @@ All data lives in your OS user-data directory (`%APPDATA%/maulwurf-lite` on Wind
 - `backups/` — automatic and manual JSON backups.
 
 Nothing ever leaves your machine.
+
+## License
+
+[Apache License 2.0](LICENSE) — the same license as the main [Maulwurf](https://github.com/Strokow/Maulwurf-Personal-Finance-Tracker) project.

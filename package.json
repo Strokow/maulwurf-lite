@@ -4,6 +4,7 @@
   "description": "Maulwurf Lite — a minimal, local-first monthly obligations tracker (Electron + React + TypeScript)",
   "main": "./out/main/index.js",
   "author": "Strokow",
+  "license": "Apache-2.0",
   "homepage": "https://github.com/Strokow/maulwurf-lite",
   "scripts": {
     "format": "prettier --write .",
