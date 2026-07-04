@@ -28,6 +28,7 @@ import type {
 } from '../types'
 import type { UseStoreReturn } from '../store/useStore'
 import { useI18n } from '../i18n'
+import maulwurflogo from '../assets/maulwurflogo.png'
 import {
   clampDayToMonth,
   formatLocalDate,
@@ -1517,6 +1518,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
       {/* Header: title, month navigation, actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
+          <img src={maulwurflogo} alt="Maulwurf Logo" className="h-[70px] w-auto max-h-[70px]" />
           <h2 className="text-xl font-semibold text-neutral-200">{t('obligations')}</h2>
           <div className="flex items-center gap-2">
             <button
