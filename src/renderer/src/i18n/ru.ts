@@ -263,4 +263,17 @@ export const ru: Record<TranslationKey | `${RuPluralKey}_${'few' | 'many'}`, str
   exportFrequencyYearly: 'Ежегодно',
   exportFrequencyOnce: 'Разовое',
   exportFileName: 'maulwurf-lite обязательства {date}',
+
+  // Поступления (приход денег по месяцам — независимо от обязательств)
+  incomeIn: 'Поступления за {month}',
+  addIncome: 'Добавить поступление',
+  incomeDate: 'Дата',
+  incomeLabelCol: 'Комментарий',
+  incomeLabelPlaceholder: 'зарплата, гонорар, продажа…',
+  incomeEmpty: 'Поступлений в этом месяце пока нет',
+  exportIncome: 'Поступления',
+  exportTotalIncome: 'Всего поступлений',
+  logIncomeAdded: 'Добавлено поступление: {label}',
+  logIncomeUpdated: 'Поступление изменено',
+  logIncomeDeleted: 'Поступление удалено',
 }

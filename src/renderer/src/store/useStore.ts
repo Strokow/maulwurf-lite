@@ -5,6 +5,7 @@ import type {
   Bank,
   ChangeLogEntry,
   HistoryEntry,
+  Income,
   Obligation,
   ObligationMonth,
   ObligationSection,
@@ -24,6 +25,7 @@ export interface UseStoreReturn {
   obligations: Obligation[]
   obligationMonths: ObligationMonth[]
   banks: Bank[]
+  incomes: Income[]
   customSections: ObligationSection[]
   undoHistory: HistoryEntry[]
   redoStack: HistoryEntry[]
@@ -60,6 +62,9 @@ export interface UseStoreReturn {
   addBank: (name: string, color: string) => Promise<Bank>
   updateBank: (id: string, updates: Partial<Bank>) => Promise<void>
   deleteBank: (id: string) => Promise<void>
+  addIncome: (income: Omit<Income, 'id' | 'createdAt'>) => Promise<Income>
+  updateIncome: (id: string, updates: Partial<Omit<Income, 'id' | 'createdAt'>>) => Promise<void>
+  deleteIncome: (id: string) => Promise<void>
   updateSettings: (patch: Partial<AppSettings>) => Promise<void>
 }
 
@@ -75,6 +80,7 @@ export function useStore(): UseStoreReturn {
     obligationMonthsRef.current = obligationMonths
   }, [obligationMonths])
   const [banks, setBanks] = useState<Bank[]>([])
+  const [incomes, setIncomes] = useState<Income[]>([])
   const [customSections, setCustomSections] = useState<ObligationSection[]>([])
   const [undoHistory, setUndoHistory] = useState<HistoryEntry[]>([])
   const [redoStack, setRedoStack] = useState<HistoryEntry[]>([])
@@ -88,6 +94,7 @@ export function useStore(): UseStoreReturn {
     setObligationMonths(data.obligationMonths ?? [])
     obligationMonthsRef.current = data.obligationMonths ?? []
     setBanks(data.banks ?? [])
+    setIncomes(data.incomes ?? [])
     setCustomSections(data.customSections ?? [])
     setUndoHistory(data.undoHistory ?? [])
     setRedoStack(data.redoStack ?? [])
@@ -492,6 +499,43 @@ export function useStore(): UseStoreReturn {
     [banks, obligations]
   )
 
+  // Income log — independent of obligations; whole-array persistence like banks.
+  const addIncome = useCallback(
+    async (income: Omit<Income, 'id' | 'createdAt'>): Promise<Income> => {
+      const entry: Income = {
+        ...income,
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+      }
+      const updated = [...incomes, entry]
+      setIncomes(updated)
+      await window.api.store.setIncomes(updated)
+      await logChange('ADD_INCOME', i18nRef.current.t('logIncomeAdded', { label: entry.label }))
+      return entry
+    },
+    [incomes, logChange]
+  )
+
+  const updateIncome = useCallback(
+    async (id: string, updates: Partial<Omit<Income, 'id' | 'createdAt'>>) => {
+      const updated = incomes.map((i) => (i.id === id ? { ...i, ...updates } : i))
+      setIncomes(updated)
+      await window.api.store.setIncomes(updated)
+      await logChange('UPDATE_INCOME', i18nRef.current.t('logIncomeUpdated'))
+    },
+    [incomes, logChange]
+  )
+
+  const deleteIncome = useCallback(
+    async (id: string) => {
+      const updated = incomes.filter((i) => i.id !== id)
+      setIncomes(updated)
+      await window.api.store.setIncomes(updated)
+      await logChange('DELETE_INCOME', i18nRef.current.t('logIncomeDeleted'))
+    },
+    [incomes, logChange]
+  )
+
   const updateSettings = useCallback(
     async (patch: Partial<AppSettings>) => {
       const updated = { ...settings, ...patch }
@@ -505,6 +549,7 @@ export function useStore(): UseStoreReturn {
     obligations,
     obligationMonths,
     banks,
+    incomes,
     customSections,
     undoHistory,
     redoStack,
@@ -529,6 +574,9 @@ export function useStore(): UseStoreReturn {
     addBank,
     updateBank,
     deleteBank,
+    addIncome,
+    updateIncome,
+    deleteIncome,
     updateSettings,
   }
 }

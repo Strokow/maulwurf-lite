@@ -29,6 +29,8 @@ import type {
 import type { UseStoreReturn } from '../store/useStore'
 import { useI18n } from '../i18n'
 import maulwurflogo from '../assets/maulwurflogo.png'
+import { IncomePanel } from './IncomePanel'
+import { incomesForMonth, sumIncomes, formatIncomeDate } from '../utils/incomeEngine'
 import {
   clampDayToMonth,
   formatLocalDate,
@@ -73,6 +75,10 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
     addCustomSection: onAddSection,
     deleteCustomSection: onDeleteSection,
     renameCustomSection: onRenameSection,
+    incomes,
+    addIncome: onAddIncome,
+    updateIncome: onUpdateIncome,
+    deleteIncome: onDeleteIncome,
   } = store
 
   const i18n = useI18n()
@@ -119,6 +125,11 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
 
   const bankById = useMemo(() => new Map(banks.map((b) => [b.id, b])), [banks])
   const currentMonthLabel = monthYear(year, month)
+
+  // Income of the viewed month — its own per-month log, independent of the
+  // obligations logic; only displayed alongside it.
+  const monthIncomes = useMemo(() => incomesForMonth(incomes, year, month), [incomes, year, month])
+  const totalIncome = useMemo(() => sumIncomes(monthIncomes), [monthIncomes])
 
   const canGoPrev = true
   // Budget planning up to 3 months ahead.
@@ -1315,6 +1326,22 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
       )
       .join('')
 
+    const incomeMd =
+      monthIncomes.length === 0
+        ? ''
+        : [
+            `\n## ${t('exportIncome')} (${monthIncomes.length})`,
+            ``,
+            `| ${t('incomeDate')} | ${t('incomeLabelCol')} | ${t('exportColAmount')} |`,
+            `|---|---|---|`,
+            ...monthIncomes.map(
+              (i) =>
+                `| ${formatIncomeDate(i.date, i18n.locale)} | ${(i.label || '—').replace(/\|/g, '\\|')} | ${fmt(i.amount)} |`
+            ),
+            `| **${t('exportTotalIncome')}** | | **${fmt(totalIncome)}** |`,
+            ``,
+          ].join('\n')
+
     const md = [
       `# ${t('exportTitle', { month: currentMonthLabel })}`,
       ``,
@@ -1327,12 +1354,14 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
       `| ${t('exportTotalPayable')} | ${fmt(data.totalPayable)} |`,
       `| ${t('exportPaid')} | ${fmt(data.totalPaidAmt)} (${tn('exportPositions', data.paidCountAll)}) |`,
       `| ${t('exportPending')} | ${data.pendingCountAll} |`,
+      `| ${t('exportTotalIncome')} | ${fmt(totalIncome)} |`,
       renderGroupMd(t('sectionMonthly'), data.monthlyAll),
       renderGroupMd(t('sectionInstallments'), data.installmentsAllGroup),
       renderGroupMd(t('sectionQuarterly'), data.quarterlyAll),
       renderGroupMd(t('sectionYearly'), data.yearlyAll),
       renderGroupMd(t('sectionOnce'), data.onceAll),
       allCustomMd,
+      incomeMd,
     ].join('\n')
 
     await window.api.exportMd(md, `${t('exportFileName', { date: exportStamp() })}.md`)
@@ -1353,6 +1382,9 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
     formatDateTime,
     freqLabel,
     statusLabel,
+    monthIncomes,
+    totalIncome,
+    i18n.locale,
   ])
 
   const handleExportPDF = useCallback(async () => {
@@ -1445,6 +1477,32 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
       )
       .join('')
 
+    const incomeHtml =
+      monthIncomes.length === 0
+        ? ''
+        : `<h2 style="margin:24px 0 8px;color:#111">${t('exportIncome')} <span style="color:#666;font-size:14px">(${monthIncomes.length})</span></h2>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="text-align:left;color:#666;border-bottom:2px solid #bbb">
+            <th style="padding:8px 12px">${t('incomeDate')}</th>
+            <th style="padding:8px 12px">${t('incomeLabelCol')}</th>
+            <th style="padding:8px 12px">${t('exportColAmount')}</th>
+          </tr></thead>
+          <tbody>${monthIncomes
+            .map(
+              (i) => `<tr>
+            <td style="${td}">${formatIncomeDate(i.date, i18n.locale)}</td>
+            <td style="${td}">${i.label || '—'}</td>
+            <td style="${td};color:#059669;font-weight:600">${fmt(i.amount)}</td>
+          </tr>`
+            )
+            .join('')}
+          <tr>
+            <td style="${td};font-weight:700">${t('exportTotalIncome')}</td>
+            <td style="${td}"></td>
+            <td style="${td};color:#059669;font-weight:700">${fmt(totalIncome)}</td>
+          </tr></tbody>
+        </table>`
+
     const html = `<!DOCTYPE html>
 <html lang="${i18n.language}">
 <head>
@@ -1479,6 +1537,10 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
       <div class="stat-label">${t('exportPending')}</div>
       <div class="stat-value" style="color:${data.pendingCountAll > 0 ? '#dc2626' : '#16a34a'}">${data.pendingCountAll}</div>
     </div>
+    <div class="stat">
+      <div class="stat-label">${t('exportIncome')}</div>
+      <div class="stat-value" style="color:#059669">${fmt(totalIncome)}</div>
+    </div>
   </div>
   ${renderGroup(t('sectionMonthly'), data.monthlyAll)}
   ${renderGroup(t('sectionInstallments'), data.installmentsAllGroup)}
@@ -1486,6 +1548,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
   ${renderGroup(t('sectionYearly'), data.yearlyAll)}
   ${renderGroup(t('sectionOnce'), data.onceAll)}
   ${allCustom}
+  ${incomeHtml}
 </body>
 </html>`
 
@@ -1507,7 +1570,10 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
     formatDateTime,
     freqLabel,
     statusLabel,
+    monthIncomes,
+    totalIncome,
     i18n.language,
+    i18n.locale,
   ])
 
   const sectionHeaderBtn =
@@ -1714,6 +1780,19 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
           </p>
         </div>
       </div>
+
+      {/* Income of the month — own log, only visually part of the dashboard */}
+      <IncomePanel
+        incomes={monthIncomes}
+        total={totalIncome}
+        currency={currency}
+        year={year}
+        month={month}
+        monthLabel={currentMonthLabel}
+        onAdd={onAddIncome}
+        onUpdate={onUpdateIncome}
+        onDelete={onDeleteIncome}
+      />
 
       {/* Due warning banner */}
       {dueWarnings.length > 0 && (

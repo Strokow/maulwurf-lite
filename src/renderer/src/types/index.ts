@@ -59,6 +59,17 @@ export interface ObligationMonth {
   carriedPaid?: boolean // the carried debt has been settled
 }
 
+// ── Income (money coming in, per month) ────────────────────
+// Fully independent of obligations: an entry belongs to the month of its
+// date, so every month has its own list and total starting from zero.
+export interface Income {
+  id: string
+  date: string // local ISO date 'YYYY-MM-DD'; determines the month it belongs to
+  amount: number
+  label: string // free-form comment: salary, fee, quick sell, …
+  createdAt: string
+}
+
 // ── Custom obligation sections ─────────────────────────────
 export interface ObligationSection {
   id: string
@@ -112,6 +123,7 @@ export interface AppData {
   obligations: Obligation[]
   obligationMonths: ObligationMonth[]
   banks: Bank[]
+  incomes: Income[]
   customSections: ObligationSection[]
   undoHistory: HistoryEntry[]
   redoStack: HistoryEntry[]

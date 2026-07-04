@@ -252,4 +252,17 @@ export const fr: Record<TranslationKey, string> = {
   exportFrequencyYearly: 'Annuel',
   exportFrequencyOnce: 'Ponctuel',
   exportFileName: 'maulwurf-lite engagements {date}',
+
+  // Revenus (entrées d'argent, par mois — indépendants des engagements)
+  incomeIn: 'Revenus en {month}',
+  addIncome: 'Ajouter un revenu',
+  incomeDate: 'Date',
+  incomeLabelCol: 'Description',
+  incomeLabelPlaceholder: 'salaire, honoraires, vente rapide…',
+  incomeEmpty: 'Aucun revenu enregistré ce mois-ci',
+  exportIncome: 'Revenus',
+  exportTotalIncome: 'Revenus totaux',
+  logIncomeAdded: 'Revenu ajouté : {label}',
+  logIncomeUpdated: 'Revenu modifié',
+  logIncomeDeleted: 'Revenu supprimé',
 }

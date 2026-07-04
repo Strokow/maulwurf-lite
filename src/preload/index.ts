@@ -17,6 +17,8 @@ const api = {
     setAllObligationMonths: (months: unknown[]): Promise<void> =>
       ipcRenderer.invoke('store:setAllObligationMonths', months),
     setBanks: (banks: unknown[]): Promise<void> => ipcRenderer.invoke('store:setBanks', banks),
+    setIncomes: (incomes: unknown[]): Promise<void> =>
+      ipcRenderer.invoke('store:setIncomes', incomes),
     saveCustomSections: (sections: unknown[]): Promise<void> =>
       ipcRenderer.invoke('store:saveCustomSections', sections),
     saveUndoHistory: (history: unknown[]): Promise<void> =>

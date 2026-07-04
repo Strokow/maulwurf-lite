@@ -252,4 +252,17 @@ export const de: Record<TranslationKey, string> = {
   exportFrequencyYearly: 'Jährlich',
   exportFrequencyOnce: 'Einmalig',
   exportFileName: 'maulwurf-lite Verpflichtungen {date}',
+
+  // Einnahmen (Geldeingänge pro Monat — unabhängig von Verpflichtungen)
+  incomeIn: 'Einnahmen im {month}',
+  addIncome: 'Einnahme hinzufügen',
+  incomeDate: 'Datum',
+  incomeLabelCol: 'Beschreibung',
+  incomeLabelPlaceholder: 'Gehalt, Honorar, Verkauf…',
+  incomeEmpty: 'Keine Einnahmen in diesem Monat erfasst',
+  exportIncome: 'Einnahmen',
+  exportTotalIncome: 'Einnahmen gesamt',
+  logIncomeAdded: 'Einnahme hinzugefügt: {label}',
+  logIncomeUpdated: 'Einnahme aktualisiert',
+  logIncomeDeleted: 'Einnahme gelöscht',
 }

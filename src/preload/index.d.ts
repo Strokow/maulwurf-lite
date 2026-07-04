@@ -10,6 +10,7 @@ interface LiteApi {
     setObligationMonth: (record: unknown) => Promise<void>
     setAllObligationMonths: (months: unknown[]) => Promise<void>
     setBanks: (banks: unknown[]) => Promise<void>
+    setIncomes: (incomes: unknown[]) => Promise<void>
     saveCustomSections: (sections: unknown[]) => Promise<void>
     saveUndoHistory: (history: unknown[]) => Promise<void>
     saveRedoStack: (stack: unknown[]) => Promise<void>

@@ -250,6 +250,19 @@ export const en = {
   exportFrequencyYearly: 'Yearly',
   exportFrequencyOnce: 'One-time',
   exportFileName: 'maulwurf-lite obligations {date}',
+
+  // Income (money in, per month — independent of obligations)
+  incomeIn: 'Income in {month}',
+  addIncome: 'Add income',
+  incomeDate: 'Date',
+  incomeLabelCol: 'Description',
+  incomeLabelPlaceholder: 'salary, fee, quick sell…',
+  incomeEmpty: 'No income recorded this month',
+  exportIncome: 'Income',
+  exportTotalIncome: 'Total income',
+  logIncomeAdded: 'Income added: {label}',
+  logIncomeUpdated: 'Income updated',
+  logIncomeDeleted: 'Income deleted',
 }
 
 export type TranslationKey = keyof typeof en
