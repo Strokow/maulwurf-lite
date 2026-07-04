@@ -6,8 +6,9 @@ Maulwurf Lite is the lightweight sibling of the [Maulwurf personal finance track
 
 - **Interface languages: English, French, German and Russian** — chosen on first run, switchable anytime in Settings.
 - **Your own banks** — nothing is hard-coded. Add any bank or payment service (name + color) and assign it to obligations.
-- **100% local** — all data stays on your machine (`electron-store` JSON + automatic local backups). No accounts, no cloud, no telemetry.
-- **PIN protection** — optional 6-digit PIN with lockout after 3 failed attempts (SHA-256 hash only, never plaintext).
+- **100% local** — all data stays on your machine. No accounts, no cloud, no telemetry.
+- **Encrypted at rest** — the local database and automatic backups are encrypted with your operating-system account key (Windows DPAPI via Electron `safeStorage`), so the files can't be read by another user or copied to another machine. Manual *Export to file* stays plain JSON on purpose, so you can move or share it.
+- **PIN protection** — optional 6-digit PIN with lockout after 3 failed attempts (only a SHA-256 hash is stored, never the PIN). The PIN gate is enforced in the app's background process: the data stays sealed until the correct PIN is entered.
 
 ## Features
 
@@ -23,6 +24,9 @@ A single obligations board with a **month switcher** (unlimited past, up to 3 mo
 
 ### Debt carry-over
 An unpaid obligation can be **carried to any future month**. The source card is dimmed with a note, the target month shows the carried debt separately from the month's own charge, with *"Pay all"* / *"Settle debt"* buttons and a late-fee warning. Carrying is fully reversible.
+
+### Monthly income log
+A compact dashboard card shows **how much money came in this month**; click it to expand the list of entries (date, amount, free-form comment — salary, fee, quick sell, …) with inline add / edit / delete. Each month keeps its own list and total, fully independent of the obligations, and the data is included in the Markdown/PDF export.
 
 ### More
 - **Effective-dated price changes** — "the subscription costs X starting from this month"; past months keep the old price.
@@ -65,8 +69,9 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the process model, data mod
 ## Data & privacy
 
 All data lives in your OS user-data directory (`%APPDATA%/maulwurf-lite` on Windows):
-- `config.json` — obligations, month statuses, banks, sections, settings, PIN hash.
-- `backups/` — automatic and manual JSON backups.
+- `config.json` — obligations, month statuses, banks, incomes, sections, settings, PIN hash. **Encrypted** with your OS account key (`safeStorage`); an existing plain-text file from an older version is migrated to encrypted automatically on first launch.
+- `backups/` — automatic and manual backups, encrypted the same way.
+- *Export to file* produces a **plain JSON** copy on purpose, so it stays portable — keep exported files somewhere safe.
 
 Nothing ever leaves your machine.
 

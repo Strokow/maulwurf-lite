@@ -1,5 +1,6 @@
-import { app, shell, BrowserWindow, ipcMain, Menu, dialog } from 'electron'
-import { join } from 'path'
+import { app, shell, safeStorage, BrowserWindow, ipcMain, Menu, dialog } from 'electron'
+import { basename, join } from 'path'
+import { readFileSync } from 'fs'
 import { writeFile, readFile, readdir, mkdir, unlink, stat } from 'fs/promises'
 import { optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.ico?asset'
@@ -7,6 +8,35 @@ import Store from 'electron-store'
 import { hashPin, verifyPin } from './pinService'
 
 const MAX_ATTEMPTS = 3
+
+// ── Encryption at rest (safeStorage / DPAPI on Windows) ─────
+// config.json and internal backups are encrypted, tied to the OS user account.
+// Manual export-to-file stays plaintext JSON on purpose (portable). If the OS
+// keychain is unavailable we transparently fall back to plaintext so the app
+// never becomes unusable.
+const ENC_TAG = '__mlwEnc'
+
+function encryptString(plain: string): string {
+  if (!safeStorage.isEncryptionAvailable()) return plain
+  const payload = safeStorage.encryptString(plain).toString('base64')
+  return JSON.stringify({ [ENC_TAG]: 1, data: payload })
+}
+
+// Reads either an encrypted wrapper or legacy plaintext (auto-migration path).
+function decryptString(raw: string): string {
+  const trimmed = raw.trimStart()
+  if (trimmed.startsWith(`{"${ENC_TAG}"`)) {
+    try {
+      const parsed = JSON.parse(raw) as { [ENC_TAG]?: number; data?: string }
+      if (parsed[ENC_TAG] === 1 && typeof parsed.data === 'string') {
+        return safeStorage.decryptString(Buffer.from(parsed.data, 'base64'))
+      }
+    } catch {
+      // fall through to returning the raw content
+    }
+  }
+  return raw
+}
 
 interface Obligation {
   id: string
@@ -33,6 +63,14 @@ interface Bank {
   id: string
   name: string
   color: string
+  createdAt: string
+}
+
+interface Income {
+  id: string
+  date: string
+  amount: number
+  label: string
   createdAt: string
 }
 
@@ -67,6 +105,7 @@ interface StoreSchema {
   obligations: Obligation[]
   obligationMonths: ObligationMonth[]
   banks: Bank[]
+  incomes: Income[]
   customSections: unknown[]
   undoHistory: unknown[]
   redoStack: unknown[]
@@ -88,21 +127,44 @@ const DEFAULT_SETTINGS: AppSettings = {
   onboarded: false,
 }
 
-const store = new Store<StoreSchema>({
-  // @ts-ignore - projectName is valid at runtime but missing from electron-store typedefs
-  projectName: 'maulwurf-lite',
-  defaults: {
-    obligations: [],
-    obligationMonths: [],
-    banks: [],
-    customSections: [],
-    undoHistory: [],
-    redoStack: [],
-    changeLog: [],
-    pinSettings: DEFAULT_PIN,
-    settings: DEFAULT_SETTINGS,
-  },
-})
+// Constructed inside app.whenReady() — safeStorage is only usable after the
+// app is ready, and serialize/deserialize below depend on it.
+function createStore(): Store<StoreSchema> {
+  const store = new Store<StoreSchema>({
+    // @ts-ignore - projectName is valid at runtime but missing from electron-store typedefs
+    projectName: 'maulwurf-lite',
+    // Whole-file encryption via safeStorage; legacy plaintext files are read
+    // transparently and re-encrypted on the next write (see migration below).
+    serialize: (value): string => encryptString(JSON.stringify(value, null, 2)),
+    deserialize: (raw): StoreSchema => JSON.parse(decryptString(raw)),
+    defaults: {
+      obligations: [],
+      obligationMonths: [],
+      banks: [],
+      incomes: [],
+      customSections: [],
+      undoHistory: [],
+      redoStack: [],
+      changeLog: [],
+      pinSettings: DEFAULT_PIN,
+      settings: DEFAULT_SETTINGS,
+    },
+  })
+  // One-time migration: if the on-disk file is still plaintext, force a full
+  // rewrite (conf writes the whole file) so it goes through `serialize` and
+  // gets encrypted. Skipped when the file is already encrypted or absent.
+  if (safeStorage.isEncryptionAvailable()) {
+    try {
+      const onDisk = readFileSync(store.path, 'utf-8')
+      if (!onDisk.trimStart().startsWith(`{"${ENC_TAG}"`)) {
+        store.set('settings', store.get('settings', DEFAULT_SETTINGS))
+      }
+    } catch {
+      // No file yet (fresh install) — the first real write will be encrypted.
+    }
+  }
+  return store
+}
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -127,16 +189,28 @@ function createWindow(): void {
     mainWindow.show()
   })
 
-  // Ctrl+Shift+I toggles DevTools
-  mainWindow.webContents.on('before-input-event', (_event, input) => {
-    if (input.control && input.shift && input.key.toLowerCase() === 'i') {
-      mainWindow.webContents.toggleDevTools()
-    }
-  })
+  // Ctrl+Shift+I toggles DevTools — dev builds only. In a packaged app the
+  // console would let anyone read the store or reset the PIN, so it is disabled.
+  if (is.dev) {
+    mainWindow.webContents.on('before-input-event', (_event, input) => {
+      if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+        mainWindow.webContents.toggleDevTools()
+      }
+    })
+  }
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
+  })
+
+  // Block in-page navigation: a link dropped onto the window must not steer the
+  // app (which has the preload attached) to an arbitrary origin. Only the dev
+  // server URL is allowed; in production nothing navigates.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const devUrl = process.env['ELECTRON_RENDERER_URL']
+    if (devUrl && url.startsWith(devUrl)) return
+    event.preventDefault()
   })
 
   // Right-click context menu for copy/paste with mouse
@@ -161,6 +235,14 @@ function createWindow(): void {
 app.whenReady().then(() => {
   app.setAppUserModelId('com.strokow.maulwurf-lite')
 
+  const store = createStore()
+
+  // Renderer lock state, enforced in the main process (defence in depth): when
+  // a PIN is enabled the sensitive store channels stay closed until pin:verify
+  // (or pin:set/disable) proves the PIN — an open DevTools console can't read
+  // or write data at the lock screen. Starts unlocked when no PIN is set.
+  let unlocked = !store.get('pinSettings', DEFAULT_PIN).enabled
+
   // Enable copy/paste/cut/selectAll via menu (needed for Electron)
   const template: Electron.MenuItemConstructorOptions[] = [
     {
@@ -182,26 +264,55 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  // Sensitive mutations refuse to run until the PIN gate is passed — an open
+  // console can't alter data at the lock screen.
+  const guardWrite = (): void => {
+    if (!unlocked) throw new Error('locked')
+  }
+
   // ── Store IPC ───────────────────────────────────────────
-  ipcMain.handle('store:getAll', () => ({
-    obligations: store.get('obligations', []),
-    obligationMonths: store.get('obligationMonths', []),
-    banks: store.get('banks', []),
-    customSections: store.get('customSections', []),
-    undoHistory: store.get('undoHistory', []),
-    redoStack: store.get('redoStack', []),
-    changeLog: store.get('changeLog', []),
-    pinSettings: store.get('pinSettings', DEFAULT_PIN),
-    settings: store.get('settings', DEFAULT_SETTINGS),
-  }))
+  // While locked, getAll returns ONLY what the boot screen legitimately needs
+  // (language + onboarded flag) — never the financial data behind the PIN.
+  ipcMain.handle('store:getAll', () => {
+    const settings = store.get('settings', DEFAULT_SETTINGS)
+    const pinSettings = store.get('pinSettings', DEFAULT_PIN)
+    if (!unlocked) {
+      return {
+        obligations: [],
+        obligationMonths: [],
+        banks: [],
+        incomes: [],
+        customSections: [],
+        undoHistory: [],
+        redoStack: [],
+        changeLog: [],
+        pinSettings,
+        settings,
+      }
+    }
+    return {
+      obligations: store.get('obligations', []),
+      obligationMonths: store.get('obligationMonths', []),
+      banks: store.get('banks', []),
+      incomes: store.get('incomes', []),
+      customSections: store.get('customSections', []),
+      undoHistory: store.get('undoHistory', []),
+      redoStack: store.get('redoStack', []),
+      changeLog: store.get('changeLog', []),
+      pinSettings,
+      settings,
+    }
+  })
 
   ipcMain.handle('store:addObligation', (_event, obligation: Obligation) => {
+    guardWrite()
     const obligations = store.get('obligations', [])
     obligations.push(obligation)
     store.set('obligations', obligations)
   })
 
   ipcMain.handle('store:updateObligation', (_event, id: string, updates: Partial<Obligation>) => {
+    guardWrite()
     const obligations = store.get('obligations', [])
     const idx = obligations.findIndex((o) => o.id === id)
     if (idx !== -1) {
@@ -211,6 +322,7 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('store:deleteObligation', (_event, id: string) => {
+    guardWrite()
     store.set(
       'obligations',
       store.get('obligations', []).filter((o) => o.id !== id)
@@ -222,10 +334,12 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('store:setObligations', (_event, obligations: Obligation[]) => {
+    guardWrite()
     store.set('obligations', obligations)
   })
 
   ipcMain.handle('store:setObligationMonth', (_event, record: ObligationMonth) => {
+    guardWrite()
     const months = store.get('obligationMonths', [])
     const idx = months.findIndex(
       (m) =>
@@ -240,32 +354,44 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('store:setAllObligationMonths', (_event, months: ObligationMonth[]) => {
+    guardWrite()
     store.set('obligationMonths', months)
   })
 
   ipcMain.handle('store:setBanks', (_event, banks: Bank[]) => {
+    guardWrite()
     store.set('banks', banks)
   })
 
+  ipcMain.handle('store:setIncomes', (_event, incomes: Income[]) => {
+    guardWrite()
+    store.set('incomes', incomes)
+  })
+
   ipcMain.handle('store:saveCustomSections', (_event, sections: unknown[]) => {
+    guardWrite()
     store.set('customSections', sections)
   })
 
   ipcMain.handle('store:saveUndoHistory', (_event, history: unknown[]) => {
+    guardWrite()
     store.set('undoHistory', history)
   })
 
   ipcMain.handle('store:saveRedoStack', (_event, stack: unknown[]) => {
+    guardWrite()
     store.set('redoStack', stack)
   })
 
   ipcMain.handle('store:addChangeLog', (_event, entry: ChangeLogEntry) => {
+    guardWrite()
     const log = store.get('changeLog', [])
     log.unshift(entry)
     store.set('changeLog', log.slice(0, 500))
   })
 
   ipcMain.handle('store:saveSettings', (_event, settings: AppSettings) => {
+    guardWrite()
     store.set('settings', settings)
   })
 
@@ -274,6 +400,7 @@ app.whenReady().then(() => {
     const pinSettings = store.get('pinSettings', DEFAULT_PIN)
     const result = verifyPin(input, pinSettings)
     if (result.success) {
+      unlocked = true // correct PIN — open the sensitive channels for this session
       store.set('pinSettings', { ...pinSettings, failedAttempts: 0, lockoutUntil: null })
     } else if (result.lockoutUntil) {
       store.set('pinSettings', {
@@ -291,12 +418,19 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('pin:set', (_event, pin: string) => {
+    // Changing an existing PIN requires being past the gate — this blocks a
+    // silent PIN reset from an open console at the lock screen. First-time
+    // setup (no PIN yet) is allowed: `unlocked` is true when none is enabled.
+    if (store.get('pinSettings', DEFAULT_PIN).enabled && !unlocked) {
+      return { success: false, error: 'locked' }
+    }
     store.set('pinSettings', {
       enabled: true,
       pinHash: hashPin(pin),
       lockoutUntil: null,
       failedAttempts: 0,
     })
+    unlocked = true
     return { success: true }
   })
 
@@ -306,6 +440,7 @@ app.whenReady().then(() => {
     const result = verifyPin(input, pinSettings)
     if (!result.success) return { success: false, error: 'Invalid PIN' }
     store.set('pinSettings', { ...DEFAULT_PIN })
+    unlocked = true // PIN proven and now removed
     return { success: true }
   })
 
@@ -321,6 +456,8 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('openDevTools', (event) => {
+    // Dev builds only — see the DevTools note in createWindow.
+    if (!is.dev) return
     const win = BrowserWindow.fromWebContents(event.sender)
     if (win) {
       win.webContents.openDevTools()
@@ -335,6 +472,7 @@ app.whenReady().then(() => {
       obligations: store.get('obligations', []),
       obligationMonths: store.get('obligationMonths', []),
       banks: store.get('banks', []),
+      incomes: store.get('incomes', []),
       customSections: store.get('customSections', []),
       undoHistory: store.get('undoHistory', []),
       redoStack: store.get('redoStack', []),
@@ -348,6 +486,7 @@ app.whenReady().then(() => {
     'obligations',
     'obligationMonths',
     'banks',
+    'incomes',
     'customSections',
     'undoHistory',
     'redoStack',
@@ -356,12 +495,18 @@ app.whenReady().then(() => {
     'settings',
   ]
 
+  // Internal backups live in %APPDATA% next to config.json, so they are
+  // encrypted the same way. Manual export-to-file stays plaintext (portable).
   async function createBackup(): Promise<void> {
     await mkdir(backupDir, { recursive: true })
     const data = getFullStoreData()
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const filename = `backup-${timestamp}.json`
-    await writeFile(join(backupDir, filename), JSON.stringify(data, null, 2), 'utf-8')
+    await writeFile(
+      join(backupDir, filename),
+      encryptString(JSON.stringify(data, null, 2)),
+      'utf-8'
+    )
     // Keep only the last 10 backups
     const files = (await readdir(backupDir))
       .filter((f) => f.startsWith('backup-') && f.endsWith('.json'))
@@ -385,7 +530,7 @@ app.whenReady().then(() => {
       const info = await stat(filePath)
       let obligationCount = 0
       try {
-        const raw = JSON.parse(await readFile(filePath, 'utf-8'))
+        const raw = JSON.parse(decryptString(await readFile(filePath, 'utf-8')))
         obligationCount = Array.isArray(raw.obligations) ? raw.obligations.length : 0
       } catch {}
       // Extract timestamp from filename: backup-2026-04-15T10-30-00-000Z.json
@@ -400,37 +545,55 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('backup:create', async () => {
+    guardWrite()
     await createBackup()
   })
 
   ipcMain.handle('backup:restore', async (_event, filename: string) => {
-    const raw = JSON.parse(await readFile(join(backupDir, filename), 'utf-8')) as Record<
-      string,
-      unknown
-    >
+    guardWrite()
+    // Harden against path traversal: strip any directory part and accept only a
+    // real backup file name — a crafted `../../foo` can't escape the backup dir.
+    const safe = basename(String(filename))
+    if (!/^backup-[\d-]+T[\d-]+Z\.json$/.test(safe)) {
+      return { success: false, error: 'invalid filename' }
+    }
+    const parsed = JSON.parse(
+      decryptString(await readFile(join(backupDir, safe), 'utf-8'))
+    ) as Record<string, unknown>
+    if (typeof parsed !== 'object' || parsed === null) {
+      return { success: false, error: 'invalid backup' }
+    }
     for (const key of RESTORE_KEYS) {
-      if (key in raw) store.set(key, raw[key] as never)
+      if (key in parsed) store.set(key, parsed[key] as never)
     }
     return { success: true }
   })
 
   ipcMain.handle('backup:exportToFile', async () => {
+    guardWrite() // exporting reads all data — never allow it at the lock screen
     const { canceled, filePath } = await dialog.showSaveDialog({
       defaultPath: `maulwurf-lite-backup-${new Date().toISOString().slice(0, 10)}.json`,
       filters: [{ name: 'JSON', extensions: ['json'] }],
     })
     if (canceled || !filePath) return { success: false }
+    // Plaintext on purpose: a manual export is meant to be portable/shareable.
     await writeFile(filePath, JSON.stringify(getFullStoreData(), null, 2), 'utf-8')
     return { success: true }
   })
 
   ipcMain.handle('backup:importFromFile', async () => {
+    guardWrite()
     const { canceled, filePaths } = await dialog.showOpenDialog({
       filters: [{ name: 'JSON', extensions: ['json'] }],
       properties: ['openFile'],
     })
     if (canceled || !filePaths[0]) return { success: false }
-    const raw = JSON.parse(await readFile(filePaths[0], 'utf-8')) as Record<string, unknown>
+    // Tolerates both a plaintext export and an encrypted backup file.
+    const raw = JSON.parse(decryptString(await readFile(filePaths[0], 'utf-8'))) as Record<
+      string,
+      unknown
+    >
+    if (typeof raw !== 'object' || raw === null) return { success: false, error: 'invalid file' }
     for (const key of RESTORE_KEYS) {
       if (key in raw) store.set(key, raw[key] as never)
     }

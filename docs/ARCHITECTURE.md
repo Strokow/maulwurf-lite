@@ -14,7 +14,7 @@
 └─────────────────────┘               │  src/renderer/      │
                                       │  (React 19 + Vite)  │
                                       │  - useStore hook    │
-                                      │  - i18n (EN/FR)     │
+                                      │  - i18n EN/FR/DE/RU │
                                       │  - UI components    │
                                       └─────────────────────┘
 ```
@@ -23,6 +23,7 @@
 - All IPC handlers live in [`src/main/index.ts`](../src/main/index.ts). The preload only forwards calls; it adds no logic.
 - The renderer has no `nodeIntegration`; file-system access goes exclusively through `window.api.*`.
 - Business logic for obligations lives in the renderer ([`utils/obligationEngine.ts`](../src/renderer/src/utils/obligationEngine.ts) + [`store/useStore.ts`](../src/renderer/src/store/useStore.ts)). The main process only stores and returns data.
+- The income log is deliberately separate from the obligations logic: [`utils/incomeEngine.ts`](../src/renderer/src/utils/incomeEngine.ts) (month filtering/sums) + the `incomes` slice in `useStore`. Nothing in it reads or writes obligation data.
 
 ## Data model
 
@@ -34,10 +35,11 @@ Defined in [`src/renderer/src/types/index.ts`](../src/renderer/src/types/index.t
 | `ObligationMonth` | The payment **status of one obligation for one month**. Key: `(obligationId, year, month)`. Status: `paid` / `unpaid` / `unknown` / `skipped`. Also holds the carry-over fields (`isCarriedOver`, `carriedFromYear/Month`, `carriedAmount`, `carriedPaid`). |
 | `Bank` | User-defined bank / payment service (name + badge color). Deleting a bank detaches it from obligations, which keep working without one. |
 | `ObligationSection` | A custom card group, filled via drag & drop. |
+| `Income` | One money-in entry: `date` (`YYYY-MM-DD`, defines the month it belongs to), `amount`, free-form `label`. Independent of obligations; each month has its own list and total. |
 | `HistoryEntry` | One undo/redo step: partial before/after snapshots of `obligations` / `obligationMonths`. Max 10, persisted. |
 | `ChangeLogEntry` | Human-readable audit log entry (max 500, persisted). |
 | `PinSettings` | `enabled`, SHA-256 `pinHash` (never plaintext), lockout state. |
-| `AppSettings` | `language` (`en` / `fr`), display `currency`, `onboarded` flag. |
+| `AppSettings` | `language` (`en` / `fr` / `de` / `ru`), display `currency`, `onboarded` flag. |
 
 ## Core invariants
 
@@ -50,33 +52,35 @@ Defined in [`src/renderer/src/types/index.ts`](../src/renderer/src/types/index.t
 7. **Undo snapshots** of `obligationMonths` are taken from a ref (`obligationMonthsRef`), never inside a React state updater — after an `await`, an updater may not have run yet and would capture an empty snapshot that undo would then apply, wiping every status. Additionally `undo`/`redo` refuse to apply an empty `obligationMonths` snapshot over a non-empty state.
 8. **One click — one undo entry:** a status toggle (which may cascade to linked children and auto-settle up to 3 previous unpaid months) pushes a single combined undo entry; the inner status writes run with `skipUndo`.
 9. **Mutation contract in `useStore`:** IPC persist → change-log entry → local `setState` (and ref sync) → `pushUndo`. New mutations must follow the same order.
-10. **PIN:** only the SHA-256 hash is stored; verification and lockout (3 attempts → 5-minute lockout) run in the main process (`pinService.ts`). The PIN never appears in logs.
+10. **PIN:** only the SHA-256 hash is stored; verification and lockout (3 attempts → 5-minute lockout) run in the main process (`pinService.ts`). The PIN never appears in logs. The lock is enforced in the **main process**: when a PIN is enabled the sensitive `store:*` channels refuse to read or write (and `store:getAll` returns only the boot settings) until `pin:verify`/`pin:set`/`pin:disable` succeeds — an open DevTools console can't reach the data at the lock screen. `pin:set` refuses to change an existing PIN unless already unlocked. DevTools are disabled in production builds.
+11. **Encryption at rest:** `config.json` and internal backups are encrypted through Electron `safeStorage` (Windows DPAPI, tied to the OS account) via electron-store `serialize`/`deserialize`. A legacy plaintext file is read transparently and re-encrypted on first launch. `safeStorage` is only available after `app.whenReady()`, so the store is constructed there, not at module load. Manual *export-to-file* is intentionally plaintext JSON (portable); import tolerates both. `backup:restore` sanitises the filename (`basename` + a strict `backup-…Z.json` pattern) to block path traversal.
 
 ## Internationalisation
 
-- Dictionaries: [`i18n/en.ts`](../src/renderer/src/i18n/en.ts) (source of truth for keys) and [`i18n/fr.ts`](../src/renderer/src/i18n/fr.ts) (typed as `Record<TranslationKey, string>`, so a missing key is a compile error).
+- Dictionaries: [`i18n/en.ts`](../src/renderer/src/i18n/en.ts) (source of truth for keys); `fr.ts` / `de.ts` / `ru.ts` are typed as `Record<TranslationKey, string>`, so a missing key is a compile error.
 - `I18nProvider` + `useI18n()` expose `t(key, params)`, plural-aware `tn(key, n)`, localized month names (`Intl.DateTimeFormat`) and currency formatting (`Intl.NumberFormat`, graceful fallback for unknown codes).
-- A test ([`tests/i18n.test.ts`](../src/renderer/src/tests/i18n.test.ts)) enforces that both dictionaries share the exact same keys and placeholders.
+- `tn` picks the CLDR plural category via `Intl.PluralRules` (`_one`/`_few`/`_many`/`_other`, falling back to `_other`). Russian adds `_few`/`_many` variants for count phrases.
+- A test ([`tests/i18n.test.ts`](../src/renderer/src/tests/i18n.test.ts)) enforces that all dictionaries share the exact same keys and placeholders (extra CLDR plural forms excepted).
 - Change-log descriptions are resolved at write time in the then-current language; UI labels always follow the current language.
 
 ## First-run flow
 
 ```
 App boot ──► settings.onboarded?
-   │  no ──► Onboarding: language (EN/FR) ──► PIN setup (set / skip)
+   │  no ──► Onboarding: language (EN/FR/DE/RU) ──► PIN setup (set / skip)
    │          └─► saveSettings{language, onboarded:true} ──► main page
    │  yes ─► pin enabled? ──► PIN gate (verify, lockout countdown) ──► main page
 ```
 
 ## IPC surface (window.api)
 
-- `store.*` — `getAll`, obligation CRUD (`addObligation`, `updateObligation`, `deleteObligation`, `setObligations`), month statuses (`setObligationMonth`, `setAllObligationMonths`), `setBanks`, `saveCustomSections`, `saveUndoHistory`, `saveRedoStack`, `addChangeLog`, `saveSettings`.
+- `store.*` — `getAll`, obligation CRUD (`addObligation`, `updateObligation`, `deleteObligation`, `setObligations`), month statuses (`setObligationMonth`, `setAllObligationMonths`), `setBanks`, `setIncomes`, `saveCustomSections`, `saveUndoHistory`, `saveRedoStack`, `addChangeLog`, `saveSettings`.
 - `pin.*` — `verify`, `set`, `disable`, `status`.
 - `backup.*` — `list`, `create`, `restore`, `exportToFile`, `importFromFile`. Auto-backup runs every 30 minutes, keeping the last 10 files.
 - `exportPdf(html, name)` / `exportMd(content, name)` — save dialogs + `printToPDF` in a hidden window.
 
 ## Testing & tooling
 
-- **vitest** (jsdom): `obligationEngine`, `historyService`, `pinService`, i18n dictionary parity.
+- **vitest** (jsdom): `obligationEngine`, `incomeEngine`, `historyService`, `pinService`, i18n dictionary parity.
 - **TypeScript:** two projects — `tsconfig.node.json` (main + preload) and `tsconfig.web.json` (renderer). `npm run typecheck` must stay clean; `npm run build` runs it before bundling.
 - **Build:** electron-vite (three targets) + electron-builder (`Maulwurf-Lite-X.Y.Z-setup.exe` for Windows).
