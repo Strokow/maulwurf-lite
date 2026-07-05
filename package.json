@@ -1,6 +1,6 @@
 {
   "name": "maulwurf-lite",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Maulwurf Lite — a minimal, local-first monthly obligations tracker (Electron + React + TypeScript)",
   "main": "./out/main/index.js",
   "author": "Strokow",
