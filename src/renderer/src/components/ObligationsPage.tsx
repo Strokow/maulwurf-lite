@@ -1389,6 +1389,12 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
 
   const handleExportPDF = useCallback(async () => {
     const data = buildExportData()
+    // Escape user-controlled strings (names, notes, income labels, custom section
+    // titles) before they enter the PDF HTML template — the off-screen print
+    // window has no CSP and no preload, so unescaped markup could corrupt/alter
+    // the export.
+    const escapeHtml = (s: string): string =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
     const statusBadge = (s: ObligationStatus): string => {
       const colors: Record<ObligationStatus, string> = {
         paid: '#16a34a',
@@ -1405,7 +1411,8 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
       const rec = getMonthRecord(o.id, year, month)
       const nativeHere = isNativeActive(o, year, month)
       const transferredOut = carryDestMap.get(o.id)
-      const name = (isChildRow ? '↳ ' : '') + o.name
+      const name = escapeHtml((isChildRow ? '↳ ' : '') + o.name)
+      const notes = escapeHtml(o.notes ?? '')
       const dayStr = o.approximateDay !== null ? `~${o.approximateDay}` : ''
       if (nativeHere) {
         if (transferredOut) {
@@ -1415,7 +1422,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
           <td style="${td}">—</td>
           <td style="${td}">${dayStr}</td>
           <td style="${td};color:#b45309">${t('exportCarriedTo', { month: monthYear(transferredOut.toYear, transferredOut.toMonth) })}</td>
-          <td style="${td};color:#666">${o.notes ?? ''}</td>
+          <td style="${td};color:#666">${notes}</td>
         </tr>`)
         } else {
           const st = isPeriodCovered(o)
@@ -1429,7 +1436,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
           <td style="${td}">${amt}</td>
           <td style="${td}">${dayStr}</td>
           <td style="${td}">${statusBadge(st)}</td>
-          <td style="${td};color:#666">${o.notes ?? ''}</td>
+          <td style="${td};color:#666">${notes}</td>
         </tr>`)
         }
       }
@@ -1454,7 +1461,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
     const renderGroup = (title: string, items: Obligation[]): string => {
       if (items.length === 0) return ''
       const rows = items.flatMap((o) => rowsFor(o, false)).join('')
-      return `<h2 style="margin:24px 0 8px;color:#111">${title} <span style="color:#666;font-size:14px">(${items.length})</span></h2>
+      return `<h2 style="margin:24px 0 8px;color:#111">${escapeHtml(title)} <span style="color:#666;font-size:14px">(${items.length})</span></h2>
         <table style="width:100%;border-collapse:collapse;font-size:13px">
           <thead><tr style="text-align:left;color:#666;border-bottom:2px solid #bbb">
             <th style="padding:8px 12px">${t('exportColName')}</th>
@@ -1491,7 +1498,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
             .map(
               (i) => `<tr>
             <td style="${td}">${formatIncomeDate(i.date, i18n.locale)}</td>
-            <td style="${td}">${i.label || '—'}</td>
+            <td style="${td}">${escapeHtml(i.label || '—')}</td>
             <td style="${td};color:#059669;font-weight:600">${fmt(i.amount)}</td>
           </tr>`
             )
@@ -1507,6 +1514,7 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
 <html lang="${i18n.language}">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:;">
   <title>${t('exportTitle', { month: currentMonthLabel })}</title>
   <style>
     body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; background: #fff; color: #111; padding: 32px; max-width: 900px; margin: 0 auto; }
