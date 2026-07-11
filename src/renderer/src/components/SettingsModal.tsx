@@ -10,7 +10,14 @@ const BANK_COLORS = [
   '#14b8a6', '#3b82f6', '#8b5cf6', '#d946ef', '#64748b',
 ]
 
-const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'CAD', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK']
+// Supported currencies — display-only (no conversion). The symbol shown here is
+// the real glyph; amounts everywhere are formatted with currencyDisplay:'narrowSymbol'.
+const CURRENCIES: { code: string; symbol: string }[] = [
+  { code: 'EUR', symbol: '€' },
+  { code: 'USD', symbol: '$' },
+  { code: 'GBP', symbol: '£' },
+  { code: 'RUB', symbol: '₽' },
+]
 
 interface SettingsModalProps {
   isOpen: boolean
@@ -175,7 +182,15 @@ export function SettingsModal({ isOpen, onClose, store }: SettingsModalProps): R
                   ).map((opt) => (
                     <button
                       key={opt.value}
-                      onClick={() => void updateSettings({ language: opt.value })}
+                      onClick={() =>
+                        // Picking Russian auto-switches the currency to the ruble
+                        // (only at the moment of choosing — changeable afterwards).
+                        void updateSettings(
+                          opt.value === 'ru'
+                            ? { language: 'ru', currency: 'RUB' }
+                            : { language: opt.value }
+                        )
+                      }
                       className={`flex-1 rounded-md px-3 py-2 text-sm transition-colors ${
                         settings.language === opt.value
                           ? 'bg-green-950/40 text-green-300 ring-1 ring-green-700/50'
@@ -197,12 +212,14 @@ export function SettingsModal({ isOpen, onClose, store }: SettingsModalProps): R
                   title={t('settingsCurrency')}
                   className={inputCls}
                 >
-                  {(CURRENCIES.includes(settings.currency)
+                  {/* Keep a previously-chosen currency selectable even if it is no
+                      longer in the curated list (prepended once at the top). */}
+                  {(CURRENCIES.some((c) => c.code === settings.currency)
                     ? CURRENCIES
-                    : [settings.currency, ...CURRENCIES]
+                    : [{ code: settings.currency, symbol: settings.currency }, ...CURRENCIES]
                   ).map((c) => (
-                    <option key={c} value={c}>
-                      {c}
+                    <option key={c.code} value={c.code}>
+                      {c.symbol === c.code ? c.code : `${c.symbol}  ${c.code}`}
                     </option>
                   ))}
                 </select>

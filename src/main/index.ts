@@ -274,7 +274,9 @@ app.whenReady().then(() => {
   // While locked, getAll returns ONLY what the boot screen legitimately needs
   // (language + onboarded flag) — never the financial data behind the PIN.
   ipcMain.handle('store:getAll', () => {
-    const settings = store.get('settings', DEFAULT_SETTINGS)
+    // Merge over defaults so a settings object persisted by an OLDER build (e.g.
+    // before `currency` existed) gains any missing field on upgrade-in-place.
+    const settings = { ...DEFAULT_SETTINGS, ...store.get('settings', DEFAULT_SETTINGS) }
     const pinSettings = store.get('pinSettings', DEFAULT_PIN)
     if (!unlocked) {
       return {
@@ -478,7 +480,7 @@ app.whenReady().then(() => {
       redoStack: store.get('redoStack', []),
       changeLog: store.get('changeLog', []),
       pinSettings: store.get('pinSettings', DEFAULT_PIN),
-      settings: store.get('settings', DEFAULT_SETTINGS),
+      settings: { ...DEFAULT_SETTINGS, ...store.get('settings', DEFAULT_SETTINGS) },
     }
   }
 

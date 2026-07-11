@@ -67,7 +67,13 @@ export function buildI18n(language: Language): I18n {
       cap(new Date(2000, month - 1, 1).toLocaleDateString(locale, { month: 'short' })),
     formatCurrency: (n, currency) => {
       try {
-        return n.toLocaleString(locale, { style: 'currency', currency })
+        // narrowSymbol → always the real currency glyph (₽ $ £ €) regardless of
+        // locale, instead of a code like "RUB" or a wide form like "US$".
+        return n.toLocaleString(locale, {
+          style: 'currency',
+          currency,
+          currencyDisplay: 'narrowSymbol',
+        })
       } catch {
         // Invalid/unknown currency code — fall back to a plain number + code.
         return `${n.toFixed(2)} ${currency}`

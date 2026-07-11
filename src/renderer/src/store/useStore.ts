@@ -99,7 +99,7 @@ export function useStore(): UseStoreReturn {
     setUndoHistory(data.undoHistory ?? [])
     setRedoStack(data.redoStack ?? [])
     setChangeLog(data.changeLog ?? [])
-    setSettings(data.settings ?? DEFAULT_SETTINGS)
+    setSettings({ ...DEFAULT_SETTINGS, ...(data.settings ?? {}) })
     setLoading(false)
   }, [])
 

@@ -49,6 +49,8 @@ function App(): React.JSX.Element {
           await window.api.store.saveSettings({
             ...boot.settings,
             language,
+            // Choosing Russian at first run defaults the currency to the ruble.
+            currency: language === 'ru' ? 'RUB' : boot.settings.currency,
             onboarded: true,
           })
           // The user just typed (or skipped) the PIN — don't ask again right away.

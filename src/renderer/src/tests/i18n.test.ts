@@ -93,6 +93,11 @@ describe('buildI18n', () => {
     expect(frFmt).toContain('€')
     const ruFmt = buildI18n('ru').formatCurrency(1234.5, 'EUR')
     expect(ruFmt).toContain('€')
+    // narrowSymbol → the real ruble glyph in every locale, never the "RUB" code.
+    expect(buildI18n('ru').formatCurrency(1234.5, 'RUB')).toContain('₽')
+    const enRub = buildI18n('en').formatCurrency(1234.5, 'RUB')
+    expect(enRub).toContain('₽')
+    expect(enRub).not.toContain('RUB')
   })
 
   it('falls back gracefully on an invalid currency code', () => {
