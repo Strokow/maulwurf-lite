@@ -5,6 +5,7 @@ export interface AppSettings {
   language: Language
   currency: string // ISO 4217 code, e.g. 'EUR', 'USD', 'CHF'
   onboarded: boolean // first-run wizard (language + PIN) completed
+  prioritySectionEnabled?: boolean // "Special priority" section (Phase 7), default on
 }
 
 // ── Banks (user-defined) ───────────────────────────────────
@@ -130,4 +131,7 @@ export interface AppData {
   changeLog: ChangeLogEntry[]
   pinSettings: PinSettings
   settings: AppSettings
+  // Global "Special priority" tag (Phase 7): ids shown in the top display-only
+  // section. Does NOT change sectionId/frequency, NOT part of undo snapshots.
+  priorityObligationIds: string[]
 }

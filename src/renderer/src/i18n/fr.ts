@@ -68,6 +68,14 @@ export const fr: Record<TranslationKey, string> = {
   sectionYearly: 'Annuels',
   sectionOnce: 'Ponctuels',
   sectionInstallments: 'Paiements échelonnés',
+
+  // Special priority (Phase 7)
+  prioritySection: 'Priorité spéciale',
+  priorityAdd: 'Ajouter à la priorité',
+  priorityRemove: 'Retirer de la priorité',
+  priorityEmpty: 'Appuyez sur ★ sur une carte ou glissez-la ici',
+  priorityEnable: 'Activer la section',
+  priorityDisable: 'Désactiver la section',
   perMonth: '/mois',
   perQuarter: '/trim.',
   perYear: '/an',

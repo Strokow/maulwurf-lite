@@ -66,6 +66,14 @@ export const en = {
   sectionYearly: 'Yearly',
   sectionOnce: 'One-time',
   sectionInstallments: 'Installment plans',
+
+  // Special priority (Phase 7)
+  prioritySection: 'Special priority',
+  priorityAdd: 'Add to priority',
+  priorityRemove: 'Remove from priority',
+  priorityEmpty: 'Tap ★ on a card or drag it here',
+  priorityEnable: 'Enable section',
+  priorityDisable: 'Disable section',
   perMonth: '/mo',
   perQuarter: '/qtr',
   perYear: '/yr',

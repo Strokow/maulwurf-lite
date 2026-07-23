@@ -16,6 +16,7 @@ interface LiteApi {
     saveRedoStack: (stack: unknown[]) => Promise<void>
     addChangeLog: (entry: unknown) => Promise<void>
     saveSettings: (settings: unknown) => Promise<void>
+    savePriorityObligationIds: (ids: string[]) => Promise<void>
   }
   backup: {
     list: () => Promise<unknown[]>

@@ -16,6 +16,7 @@ import {
   Trash2,
   Check as CheckIcon,
   Download,
+  Star,
   Settings as SettingsIcon,
   History as HistoryIcon,
 } from 'lucide-react'
@@ -80,6 +81,10 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
     addIncome: onAddIncome,
     updateIncome: onUpdateIncome,
     deleteIncome: onDeleteIncome,
+    updateSettings,
+    priorityObligationIds,
+    addPriorityObligation,
+    removePriorityObligation,
   } = store
 
   const i18n = useI18n()
@@ -314,6 +319,43 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
     return map
   }, [sorted, customSections])
 
+  // "Special priority" (Phase 7): display-only list at the top. Visibility
+  // invariant — shows ONLY obligations already visible this month (built from
+  // `filtered`: native/carried, not skipped, not hidden completed). It is a tag,
+  // never revives hidden cards, and does NOT feed the page totals/counters.
+  const prioritySectionEnabled = settings.prioritySectionEnabled !== false
+  const priorityObligations = useMemo(
+    () =>
+      priorityObligationIds
+        .map((id) => filtered.find((o) => o.id === id))
+        .filter((o): o is Obligation => o != null),
+    [priorityObligationIds, filtered]
+  )
+
+  // Star button — primary add/remove (no undo: reversible with the same button).
+  const togglePriority = useCallback(
+    (id: string) => {
+      if (priorityObligationIds.includes(id)) void removePriorityObligation(id)
+      else void addPriorityObligation(id)
+    },
+    [priorityObligationIds, addPriorityObligation, removePriorityObligation]
+  )
+
+  // Isolated drop zone: dropping here only ADDS the tag — it does NOT reuse the
+  // section/child drag handlers and never changes sectionId/frequency.
+  const [priorityDropActive, setPriorityDropActive] = useState(false)
+  const handlePriorityDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setPriorityDropActive(false)
+      const id = e.dataTransfer.getData('text/plain')
+      if (!id || !obligations.some((o) => o.id === id)) return
+      if (!priorityObligationIds.includes(id)) void addPriorityObligation(id)
+    },
+    [obligations, priorityObligationIds, addPriorityObligation]
+  )
+
   const totalMonthlyFiltered = useMemo(() => {
     return filtered.reduce((sum, o) => {
       // A completed installment plan owes nothing, but months after its last
@@ -461,6 +503,9 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
         )
       }
       await onDelete(deleteConfirm)
+      // Priority-tag hygiene (Phase 7): a deleted obligation must not leave a
+      // dangling id in priorityObligationIds (add/remove without undo).
+      if (priorityObligationIds.includes(deleteConfirm)) void removePriorityObligation(deleteConfirm)
       setDeleteConfirm(null)
     }
   }
@@ -1042,6 +1087,8 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
         navYear: year,
         navMonth: month,
         occursNatively: isNativeActive(ob, year, month),
+        isPriority: priorityObligationIds.includes(ob.id),
+        onTogglePriority: () => togglePriority(ob.id),
       })
 
       return (
@@ -1142,6 +1189,8 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
       handlePayAll,
       handleReturnCarried,
       t,
+      priorityObligationIds,
+      togglePriority,
     ]
   )
 
@@ -1828,6 +1877,86 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
 
       {/* Grouped sections */}
       <div className="space-y-4">
+        {/* Special priority (Phase 7): display-only tag section. NOT part of page
+            totals. Isolated drop zone — dropping only adds the tag. */}
+        <div
+          className={`rounded-xl border transition-colors ${
+            priorityDropActive
+              ? 'border-amber-500 bg-amber-950/20'
+              : 'border-amber-900/40 bg-amber-950/5'
+          }`}
+          onDragOver={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setPriorityDropActive(true)
+          }}
+          onDragLeave={() => setPriorityDropActive(false)}
+          onDrop={handlePriorityDrop}
+        >
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Star
+                className={`h-4 w-4 ${prioritySectionEnabled ? 'fill-amber-400/40 text-amber-400' : 'text-neutral-600'}`}
+              />
+              <h3
+                className={`text-sm font-medium ${prioritySectionEnabled ? 'text-amber-200' : 'text-neutral-500'}`}
+              >
+                {t('prioritySection')}
+              </h3>
+              {prioritySectionEnabled && (
+                <>
+                  <span className="rounded-full bg-amber-900/40 px-2 py-0.5 text-xs text-amber-300">
+                    {priorityObligations.length}
+                  </span>
+                  {priorityObligations.length > 0 && (
+                    <span className="text-xs text-amber-500/70">
+                      {fmt(
+                        priorityObligations.reduce(
+                          (s, o) => s + (effectiveAmount(o, year, month) ?? 0),
+                          0
+                        )
+                      )}
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+            <button
+              onClick={() => void updateSettings({ prioritySectionEnabled: !prioritySectionEnabled })}
+              title={prioritySectionEnabled ? t('priorityDisable') : t('priorityEnable')}
+              className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+                prioritySectionEnabled ? 'bg-amber-600' : 'bg-neutral-700'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
+                  prioritySectionEnabled ? 'left-[18px]' : 'left-0.5'
+                }`}
+              />
+            </button>
+          </div>
+          <AnimatePresence>
+            {prioritySectionEnabled && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="space-y-2 px-3 pb-3">
+                  {priorityObligations.length === 0 ? (
+                    <p className="rounded border border-dashed border-amber-900/40 px-3 py-2 text-center text-xs text-amber-700/70">
+                      {t('priorityEmpty')}
+                    </p>
+                  ) : (
+                    priorityObligations.map((o) => renderObligationWithChildren(o))
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
         {/* Monthly */}
         <div
           className={`rounded-xl border bg-neutral-900/30 transition-colors ${

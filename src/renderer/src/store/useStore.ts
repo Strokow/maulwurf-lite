@@ -19,6 +19,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   language: 'en',
   currency: 'EUR',
   onboarded: false,
+  prioritySectionEnabled: true,
 }
 
 export interface UseStoreReturn {
@@ -31,6 +32,7 @@ export interface UseStoreReturn {
   redoStack: HistoryEntry[]
   changeLog: ChangeLogEntry[]
   settings: AppSettings
+  priorityObligationIds: string[]
   loading: boolean
   refresh: () => Promise<void>
   addObligation: (o: Omit<Obligation, 'id' | 'createdAt'>, createdAt?: string) => Promise<Obligation>
@@ -66,6 +68,8 @@ export interface UseStoreReturn {
   updateIncome: (id: string, updates: Partial<Omit<Income, 'id' | 'createdAt'>>) => Promise<void>
   deleteIncome: (id: string) => Promise<void>
   updateSettings: (patch: Partial<AppSettings>) => Promise<void>
+  addPriorityObligation: (id: string) => Promise<void>
+  removePriorityObligation: (id: string) => Promise<void>
 }
 
 export function useStore(): UseStoreReturn {
@@ -86,6 +90,7 @@ export function useStore(): UseStoreReturn {
   const [redoStack, setRedoStack] = useState<HistoryEntry[]>([])
   const [changeLog, setChangeLog] = useState<ChangeLogEntry[]>([])
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS)
+  const [priorityObligationIds, setPriorityObligationIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
@@ -100,6 +105,7 @@ export function useStore(): UseStoreReturn {
     setRedoStack(data.redoStack ?? [])
     setChangeLog(data.changeLog ?? [])
     setSettings({ ...DEFAULT_SETTINGS, ...(data.settings ?? {}) })
+    setPriorityObligationIds(data.priorityObligationIds ?? [])
     setLoading(false)
   }, [])
 
@@ -545,6 +551,29 @@ export function useStore(): UseStoreReturn {
     [settings]
   )
 
+  // Global "Special priority" tag (Phase 7): add/remove WITHOUT undo (reversible
+  // with the same star button); NOT part of undo snapshots.
+  const savePriorityIds = useCallback(async (ids: string[]) => {
+    setPriorityObligationIds(ids)
+    await window.api.store.savePriorityObligationIds(ids)
+  }, [])
+
+  const addPriorityObligation = useCallback(
+    async (id: string) => {
+      if (priorityObligationIds.includes(id)) return
+      await savePriorityIds([...priorityObligationIds, id])
+    },
+    [priorityObligationIds, savePriorityIds]
+  )
+
+  const removePriorityObligation = useCallback(
+    async (id: string) => {
+      if (!priorityObligationIds.includes(id)) return
+      await savePriorityIds(priorityObligationIds.filter((x) => x !== id))
+    },
+    [priorityObligationIds, savePriorityIds]
+  )
+
   return {
     obligations,
     obligationMonths,
@@ -555,6 +584,7 @@ export function useStore(): UseStoreReturn {
     redoStack,
     changeLog,
     settings,
+    priorityObligationIds,
     loading,
     refresh,
     addObligation,
@@ -578,5 +608,7 @@ export function useStore(): UseStoreReturn {
     updateIncome,
     deleteIncome,
     updateSettings,
+    addPriorityObligation,
+    removePriorityObligation,
   }
 }

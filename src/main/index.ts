@@ -85,6 +85,7 @@ interface AppSettings {
   language: string
   currency: string
   onboarded: boolean
+  prioritySectionEnabled?: boolean
 }
 
 interface PinSettings {
@@ -112,6 +113,7 @@ interface StoreSchema {
   changeLog: ChangeLogEntry[]
   pinSettings: PinSettings
   settings: AppSettings
+  priorityObligationIds: string[]
 }
 
 const DEFAULT_PIN: PinSettings = {
@@ -125,6 +127,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   language: 'en',
   currency: 'EUR',
   onboarded: false,
+  prioritySectionEnabled: true,
 }
 
 // Constructed inside app.whenReady() — safeStorage is only usable after the
@@ -148,6 +151,7 @@ function createStore(): Store<StoreSchema> {
       changeLog: [],
       pinSettings: DEFAULT_PIN,
       settings: DEFAULT_SETTINGS,
+      priorityObligationIds: [],
     },
   })
   // One-time migration: if the on-disk file is still plaintext, force a full
@@ -290,6 +294,7 @@ app.whenReady().then(() => {
         changeLog: [],
         pinSettings,
         settings,
+        priorityObligationIds: [],
       }
     }
     return {
@@ -303,6 +308,7 @@ app.whenReady().then(() => {
       changeLog: store.get('changeLog', []),
       pinSettings,
       settings,
+      priorityObligationIds: store.get('priorityObligationIds', []),
     }
   })
 
@@ -397,6 +403,13 @@ app.whenReady().then(() => {
     store.set('settings', settings)
   })
 
+  // Global "Special priority" tag (Phase 7). Soft sanitization: strings only.
+  ipcMain.handle('store:savePriorityObligationIds', (_event, ids: unknown) => {
+    guardWrite()
+    const clean = Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string') : []
+    store.set('priorityObligationIds', clean)
+  })
+
   // ── PIN IPC ─────────────────────────────────────────────
   ipcMain.handle('pin:verify', (_event, input: string) => {
     const pinSettings = store.get('pinSettings', DEFAULT_PIN)
@@ -481,6 +494,7 @@ app.whenReady().then(() => {
       changeLog: store.get('changeLog', []),
       pinSettings: store.get('pinSettings', DEFAULT_PIN),
       settings: { ...DEFAULT_SETTINGS, ...store.get('settings', DEFAULT_SETTINGS) },
+      priorityObligationIds: store.get('priorityObligationIds', []),
     }
   }
 
@@ -495,6 +509,7 @@ app.whenReady().then(() => {
     'changeLog',
     'pinSettings',
     'settings',
+    'priorityObligationIds',
   ]
 
   // Internal backups live in %APPDATA% next to config.json, so they are

@@ -75,6 +75,14 @@ export const ru: Record<TranslationKey | `${RuPluralKey}_${'few' | 'many'}`, str
   sectionYearly: 'Годовые',
   sectionOnce: 'Разовые',
   sectionInstallments: 'Рассрочки',
+
+  // Special priority (Phase 7)
+  prioritySection: 'Особый приоритет',
+  priorityAdd: 'В особый приоритет',
+  priorityRemove: 'Убрать из приоритета',
+  priorityEmpty: 'Нажми ★ на карточке или перетащи её сюда',
+  priorityEnable: 'Включить раздел',
+  priorityDisable: 'Выключить раздел',
   perMonth: '/мес',
   perQuarter: '/кв',
   perYear: '/год',

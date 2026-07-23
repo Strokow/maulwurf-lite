@@ -13,6 +13,7 @@ import {
   Unlink,
   ChevronsRight,
   ChevronsLeft,
+  Star,
 } from 'lucide-react'
 import type { Bank, Obligation, ObligationMonth, ObligationStatus } from '../types'
 import { clampDayToMonth } from '../utils/obligationEngine'
@@ -63,6 +64,9 @@ interface ObligationCardProps {
   // in its creation month). false → the card is shown ONLY because a debt was
   // carried here; the month's own payment is not charged.
   occursNatively?: boolean
+  // "Special priority" (Phase 7): star button — the primary add/remove mechanism.
+  isPriority?: boolean
+  onTogglePriority?: () => void
 }
 
 export function ObligationCard({
@@ -91,6 +95,8 @@ export function ObligationCard({
   navYear,
   navMonth,
   occursNatively,
+  isPriority,
+  onTogglePriority,
 }: ObligationCardProps): React.JSX.Element {
   const { t, tn, monthName, monthYear, monthShort, formatCurrency } = useI18n()
   const [showMonthPicker, setShowMonthPicker] = useState(false)
@@ -519,6 +525,19 @@ export function ObligationCard({
                 </button>
               )
             })()}
+          {onTogglePriority && (
+            <button
+              onClick={onTogglePriority}
+              title={isPriority ? t('priorityRemove') : t('priorityAdd')}
+              className={`rounded-md p-1.5 transition-colors ${
+                isPriority
+                  ? 'text-amber-400 hover:bg-amber-950 hover:text-amber-300'
+                  : 'text-neutral-500 hover:bg-amber-950 hover:text-amber-400'
+              }`}
+            >
+              <Star className={`h-3.5 w-3.5 ${isPriority ? 'fill-amber-400' : ''}`} />
+            </button>
+          )}
           <button
             onClick={() => setShowMonthPicker(!showMonthPicker)}
             title={t('copyToMonth')}

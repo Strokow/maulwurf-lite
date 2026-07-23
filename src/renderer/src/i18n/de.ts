@@ -68,6 +68,14 @@ export const de: Record<TranslationKey, string> = {
   sectionYearly: 'Jährlich',
   sectionOnce: 'Einmalig',
   sectionInstallments: 'Ratenzahlungen',
+
+  // Special priority (Phase 7)
+  prioritySection: 'Sonderpriorität',
+  priorityAdd: 'Zur Priorität hinzufügen',
+  priorityRemove: 'Aus Priorität entfernen',
+  priorityEmpty: 'Tippe auf ★ einer Karte oder zieh sie hierher',
+  priorityEnable: 'Bereich aktivieren',
+  priorityDisable: 'Bereich deaktivieren',
   perMonth: '/Mon.',
   perQuarter: '/Quartal',
   perYear: '/Jahr',
