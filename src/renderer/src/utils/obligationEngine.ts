@@ -94,9 +94,40 @@ export function paidInstallmentCount(o: Obligation, months: ObligationMonth[]): 
 }
 
 // A completed installment plan (paid >= totalInstallments) no longer owes
-// anything and must be excluded from every "to pay" total — but its card
-// stays visible as history.
+// anything and must be excluded from every "to pay" total. Its card is visible
+// in the month of the last payment and hidden from every later month
+// (isHiddenCompleted, Phase 6).
 export function isInstallmentCompleted(o: Obligation, months: ObligationMonth[]): boolean {
   if (!o.isInstallment || o.totalInstallments == null || o.totalInstallments <= 0) return false
   return paidInstallmentCount(o, months) >= o.totalInstallments
+}
+
+// Month of the last paid installment as y*12+m (or null when nothing is paid).
+// The "history" boundary of a completed plan (Phase 6).
+export function lastPaidYM(o: Obligation, months: ObligationMonth[]): number | null {
+  let max: number | null = null
+  for (const m of months) {
+    if (m.obligationId === o.id && m.status === 'paid') {
+      const ym = m.year * 12 + m.month
+      if (max == null || ym > max) max = ym
+    }
+  }
+  return max
+}
+
+// A completed installment plan that we no longer show in THIS month (Phase 6):
+// visible in the month of the last payment, hidden in every later month. Data is
+// NOT deleted — navigating back to a past month shows the card again, and
+// retroactively un-marking the last payment makes the plan incomplete → the card
+// returns everywhere.
+export function isHiddenCompleted(
+  o: Obligation,
+  months: ObligationMonth[],
+  year: number,
+  month: number
+): boolean {
+  if (!isInstallmentCompleted(o, months)) return false
+  const last = lastPaidYM(o, months)
+  if (last == null) return false // guard: completed with no paid records — don't hide
+  return year * 12 + month > last
 }

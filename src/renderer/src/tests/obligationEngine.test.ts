@@ -8,6 +8,8 @@ import {
   isNativeActive,
   paidInstallmentCount,
   isInstallmentCompleted,
+  lastPaidYM,
+  isHiddenCompleted,
   coverageMonths,
   paidUntil,
 } from '../utils/obligationEngine'
@@ -163,5 +165,44 @@ describe('installments', () => {
     const o = makeObligation()
     const months = [makeMonth({ status: 'paid' })]
     expect(isInstallmentCompleted(o, months)).toBe(false)
+  })
+})
+
+describe('isHiddenCompleted (Phase 6)', () => {
+  // 3-instalment plan paid in May/Jun/Jul 2026 → completed, last payment = July.
+  const done: ObligationMonth[] = [
+    makeMonth({ year: 2026, month: 5, status: 'paid' }),
+    makeMonth({ year: 2026, month: 6, status: 'paid' }),
+    makeMonth({ year: 2026, month: 7, status: 'paid' }),
+  ]
+  const partial: ObligationMonth[] = [
+    makeMonth({ year: 2026, month: 5, status: 'paid' }),
+    makeMonth({ year: 2026, month: 6, status: 'paid' }),
+    makeMonth({ year: 2026, month: 7, status: 'unpaid' }),
+  ]
+  const plan3 = makeObligation({ isInstallment: true, totalInstallments: 3 })
+
+  it('lastPaidYM = latest paid month as y*12+m; null without payments', () => {
+    expect(lastPaidYM(plan3, done)).toBe(2026 * 12 + 7)
+    expect(lastPaidYM(plan3, [])).toBeNull()
+  })
+  it('visible in the last-payment month, hidden from the next one', () => {
+    expect(isHiddenCompleted(plan3, done, 2026, 7)).toBe(false)
+    expect(isHiddenCompleted(plan3, done, 2026, 8)).toBe(true)
+    expect(isHiddenCompleted(plan3, done, 2027, 1)).toBe(true)
+  })
+  it('visible in the active months before completion', () => {
+    expect(isHiddenCompleted(plan3, done, 2026, 6)).toBe(false)
+    expect(isHiddenCompleted(plan3, done, 2026, 5)).toBe(false)
+  })
+  it('an incomplete plan is never hidden', () => {
+    expect(isHiddenCompleted(plan3, partial, 2026, 8)).toBe(false)
+  })
+  it('non-installment obligations are never hidden', () => {
+    expect(isHiddenCompleted(makeObligation(), done, 2026, 8)).toBe(false)
+  })
+  it('un-marking the last payment brings the card back', () => {
+    expect(isHiddenCompleted(plan3, done, 2026, 8)).toBe(true)
+    expect(isHiddenCompleted(plan3, partial, 2026, 8)).toBe(false)
   })
 })

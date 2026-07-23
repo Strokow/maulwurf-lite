@@ -39,6 +39,7 @@ import {
   getEffectiveStatus,
   isNativeActive,
   isInstallmentCompleted as engineInstallmentCompleted,
+  isHiddenCompleted as engineHiddenCompleted,
   coverageMonths,
   paidUntil as computePaidUntil,
   type PeriodFrequency,
@@ -153,9 +154,14 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
   const active = useMemo(
     () =>
       obligations.filter(
-        (o) => isNativeActive(o, year, month) || (o.isActive && carriedInIds.has(o.id))
+        (o) =>
+          (isNativeActive(o, year, month) || (o.isActive && carriedInIds.has(o.id))) &&
+          // Phase 6: a completed installment is visible in the month of its last
+          // payment and hidden in every later month (data is not deleted). Single
+          // choke point — removes it from cards, MD/PDF export and all totals at once.
+          !engineHiddenCompleted(o, obligationMonths, year, month)
       ),
-    [obligations, year, month, carriedInIds]
+    [obligations, year, month, carriedInIds, obligationMonths]
   )
 
   // For period obligations (yearly/quarterly): find the month they were last
@@ -289,8 +295,9 @@ export function ObligationsPage({ store }: ObligationsPageProps): React.JSX.Elem
     return map
   }, [obligations, obligationMonths])
 
-  // A completed plan stays visible as history but drops out of the header
-  // totals and the paid/pending counters.
+  // A completed plan drops out of the header totals and the paid/pending
+  // counters. Card visibility is governed by isHiddenCompleted (Phase 6): shown
+  // in the month of the last payment, hidden later (via the `active` filter).
   const isInstallmentCompleted = useCallback(
     (o: Obligation): boolean => engineInstallmentCompleted(o, obligationMonths),
     [obligationMonths]
