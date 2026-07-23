@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Plus, Trash2, Lock, Download, Upload, Save, RotateCcw, AlertTriangle } from 'lucide-react'
+import { X, Plus, Trash2, Lock, Download, Upload, Save, RotateCcw, AlertTriangle, Bell } from 'lucide-react'
 import type { BackupMeta, Language, PinStatus } from '../types'
 import type { UseStoreReturn } from '../store/useStore'
 import { useI18n } from '../i18n'
@@ -478,6 +478,39 @@ export function SettingsModal({ isOpen, onClose, store }: SettingsModalProps): R
                     ))}
                   </div>
                 )}
+              </div>
+
+              {/* Notifications (Phase 8) */}
+              <div className={sectionCls}>
+                <div className="flex items-center justify-between">
+                  <h3 className="flex items-center gap-2 text-sm font-medium text-neutral-300">
+                    <Bell className="h-4 w-4" />
+                    {t('notifSettingsTitle')}
+                  </h3>
+                  <button
+                    onClick={() =>
+                      void updateSettings({ notificationsEnabled: settings.notificationsEnabled === false })
+                    }
+                    title={
+                      settings.notificationsEnabled !== false ? t('notifDisable') : t('notifEnable')
+                    }
+                    className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+                      settings.notificationsEnabled !== false ? 'bg-amber-600' : 'bg-neutral-700'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
+                        settings.notificationsEnabled !== false ? 'left-[18px]' : 'left-0.5'
+                      }`}
+                    />
+                  </button>
+                </div>
+                <p className="text-xs text-neutral-500">{t('notifSettingsDesc')}</p>
+                <ul className="space-y-1.5 text-xs text-neutral-400">
+                  <li>• {t('notifType1')}</li>
+                  <li>• {t('notifType2')}</li>
+                  <li>• {t('notifType3')}</li>
+                </ul>
               </div>
 
               {/* About */}

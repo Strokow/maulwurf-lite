@@ -31,6 +31,8 @@ const api = {
       ipcRenderer.invoke('store:saveSettings', settings),
     savePriorityObligationIds: (ids: string[]): Promise<void> =>
       ipcRenderer.invoke('store:savePriorityObligationIds', ids),
+    saveNotificationsState: (state: unknown): Promise<void> =>
+      ipcRenderer.invoke('store:saveNotificationsState', state),
   },
   backup: {
     list: (): Promise<unknown[]> => ipcRenderer.invoke('backup:list'),

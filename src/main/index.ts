@@ -86,6 +86,13 @@ interface AppSettings {
   currency: string
   onboarded: boolean
   prioritySectionEnabled?: boolean
+  notificationsEnabled?: boolean
+}
+
+interface NotificationsState {
+  lastShownUpcomingDate?: string
+  lastShownFirstMonth?: string
+  lastShownMostlyUnpaid?: string
 }
 
 interface PinSettings {
@@ -114,6 +121,7 @@ interface StoreSchema {
   pinSettings: PinSettings
   settings: AppSettings
   priorityObligationIds: string[]
+  notificationsState: NotificationsState
 }
 
 const DEFAULT_PIN: PinSettings = {
@@ -128,6 +136,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   currency: 'EUR',
   onboarded: false,
   prioritySectionEnabled: true,
+  notificationsEnabled: true,
 }
 
 // Constructed inside app.whenReady() — safeStorage is only usable after the
@@ -152,6 +161,7 @@ function createStore(): Store<StoreSchema> {
       pinSettings: DEFAULT_PIN,
       settings: DEFAULT_SETTINGS,
       priorityObligationIds: [],
+      notificationsState: {},
     },
   })
   // One-time migration: if the on-disk file is still plaintext, force a full
@@ -295,6 +305,7 @@ app.whenReady().then(() => {
         pinSettings,
         settings,
         priorityObligationIds: [],
+        notificationsState: {},
       }
     }
     return {
@@ -309,6 +320,7 @@ app.whenReady().then(() => {
       pinSettings,
       settings,
       priorityObligationIds: store.get('priorityObligationIds', []),
+      notificationsState: store.get('notificationsState', {}),
     }
   })
 
@@ -410,6 +422,12 @@ app.whenReady().then(() => {
     store.set('priorityObligationIds', clean)
   })
 
+  // Notification dedup state (Phase 8). Persisted from the renderer after toasts show.
+  ipcMain.handle('store:saveNotificationsState', (_event, next: unknown) => {
+    guardWrite()
+    store.set('notificationsState', next && typeof next === 'object' ? (next as NotificationsState) : {})
+  })
+
   // ── PIN IPC ─────────────────────────────────────────────
   ipcMain.handle('pin:verify', (_event, input: string) => {
     const pinSettings = store.get('pinSettings', DEFAULT_PIN)
@@ -495,6 +513,7 @@ app.whenReady().then(() => {
       pinSettings: store.get('pinSettings', DEFAULT_PIN),
       settings: { ...DEFAULT_SETTINGS, ...store.get('settings', DEFAULT_SETTINGS) },
       priorityObligationIds: store.get('priorityObligationIds', []),
+      notificationsState: store.get('notificationsState', {}),
     }
   }
 
@@ -510,6 +529,7 @@ app.whenReady().then(() => {
     'pinSettings',
     'settings',
     'priorityObligationIds',
+    'notificationsState',
   ]
 
   // Internal backups live in %APPDATA% next to config.json, so they are

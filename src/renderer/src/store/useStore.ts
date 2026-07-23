@@ -6,6 +6,7 @@ import type {
   ChangeLogEntry,
   HistoryEntry,
   Income,
+  NotificationsState,
   Obligation,
   ObligationMonth,
   ObligationSection,
@@ -20,6 +21,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   currency: 'EUR',
   onboarded: false,
   prioritySectionEnabled: true,
+  notificationsEnabled: true,
 }
 
 export interface UseStoreReturn {
@@ -33,6 +35,7 @@ export interface UseStoreReturn {
   changeLog: ChangeLogEntry[]
   settings: AppSettings
   priorityObligationIds: string[]
+  notificationsState: NotificationsState
   loading: boolean
   refresh: () => Promise<void>
   addObligation: (o: Omit<Obligation, 'id' | 'createdAt'>, createdAt?: string) => Promise<Obligation>
@@ -70,6 +73,7 @@ export interface UseStoreReturn {
   updateSettings: (patch: Partial<AppSettings>) => Promise<void>
   addPriorityObligation: (id: string) => Promise<void>
   removePriorityObligation: (id: string) => Promise<void>
+  saveNotificationsState: (state: NotificationsState) => Promise<void>
 }
 
 export function useStore(): UseStoreReturn {
@@ -91,6 +95,7 @@ export function useStore(): UseStoreReturn {
   const [changeLog, setChangeLog] = useState<ChangeLogEntry[]>([])
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS)
   const [priorityObligationIds, setPriorityObligationIds] = useState<string[]>([])
+  const [notificationsState, setNotificationsStateLocal] = useState<NotificationsState>({})
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
@@ -106,6 +111,7 @@ export function useStore(): UseStoreReturn {
     setChangeLog(data.changeLog ?? [])
     setSettings({ ...DEFAULT_SETTINGS, ...(data.settings ?? {}) })
     setPriorityObligationIds(data.priorityObligationIds ?? [])
+    setNotificationsStateLocal(data.notificationsState ?? {})
     setLoading(false)
   }, [])
 
@@ -574,6 +580,12 @@ export function useStore(): UseStoreReturn {
     [priorityObligationIds, savePriorityIds]
   )
 
+  // Notification dedup state (Phase 8): persist after toasts show. Not undoable.
+  const saveNotificationsState = useCallback(async (next: NotificationsState) => {
+    setNotificationsStateLocal(next)
+    await window.api.store.saveNotificationsState(next)
+  }, [])
+
   return {
     obligations,
     obligationMonths,
@@ -585,6 +597,7 @@ export function useStore(): UseStoreReturn {
     changeLog,
     settings,
     priorityObligationIds,
+    notificationsState,
     loading,
     refresh,
     addObligation,
@@ -610,5 +623,6 @@ export function useStore(): UseStoreReturn {
     updateSettings,
     addPriorityObligation,
     removePriorityObligation,
+    saveNotificationsState,
   }
 }

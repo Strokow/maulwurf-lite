@@ -6,6 +6,14 @@ export interface AppSettings {
   currency: string // ISO 4217 code, e.g. 'EUR', 'USD', 'CHF'
   onboarded: boolean // first-run wizard (language + PIN) completed
   prioritySectionEnabled?: boolean // "Special priority" section (Phase 7), default on
+  notificationsEnabled?: boolean // in-app notifications (Phase 8), default on
+}
+
+// Persistent dedup for in-app notifications (Phase 8). Not part of undo snapshots.
+export interface NotificationsState {
+  lastShownUpcomingDate?: string // 'YYYY-MM-DD' — type 1 at most once a day
+  lastShownFirstMonth?: string // 'YYYY-MM' — type 2 once a month
+  lastShownMostlyUnpaid?: string // 'YYYY-MM' — type 3 once a month
 }
 
 // ── Banks (user-defined) ───────────────────────────────────
@@ -134,4 +142,6 @@ export interface AppData {
   // Global "Special priority" tag (Phase 7): ids shown in the top display-only
   // section. Does NOT change sectionId/frequency, NOT part of undo snapshots.
   priorityObligationIds: string[]
+  // Notification dedup state (Phase 8). Not part of undo snapshots.
+  notificationsState: NotificationsState
 }

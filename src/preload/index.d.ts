@@ -17,6 +17,7 @@ interface LiteApi {
     addChangeLog: (entry: unknown) => Promise<void>
     saveSettings: (settings: unknown) => Promise<void>
     savePriorityObligationIds: (ids: string[]) => Promise<void>
+    saveNotificationsState: (state: unknown) => Promise<void>
   }
   backup: {
     list: () => Promise<unknown[]>
